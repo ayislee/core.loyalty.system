@@ -1,0 +1,25 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+	<meta charset="UTF-8">
+	<meta name="viewport" content="width=device-width, initial-scale=1.0">
+	<meta http-equiv="X-UA-Compatible" content="ie=edge">
+	<title>Message From Customer</title>
+	@include('include.css')
+</head>
+<body>
+	<div>Hello,</div><br />
+
+	<div>Below is the message from a customer, you could reply to this email directly to answer it.</div><br />
+	<div>Name : <strong>{{passing.name}}</strong></div>
+	<div>Email : <strong>{{passing.email}}</strong></div>
+	<div>Phone : <strong>{{passing.phone}}</strong></div>
+	<div>
+		Message : <br />
+		----- <br />
+		{{passing.message}}
+	</div><br />
+
+	@include('include.footer')
+</body>
+</html>

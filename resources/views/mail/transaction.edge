@@ -1,0 +1,83 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+	<meta charset="UTF-8">
+	<meta name="viewport" content="width=device-width, initial-scale=1.0">
+	<meta http-equiv="X-UA-Compatible" content="ie=edge">
+	<title>Transaction Receipt</title>
+	@include('include.css')
+</head>
+<body>
+	<div class="container">
+		<div>
+			<div class="header-warp">
+				<div class="name">Hi, {{data.customer.firstname}}</div>
+				<div class="thank">Thank you for being part of Le Fournil Club</div>
+				<div class="success">Your Payment Has Succeeded</div>
+			</div>
+		</div>
+		<div class="trx-body">
+			<div class="title">
+				<img style="padding-right:10px" src="cid:roti" alt="roti">
+				 Here&#180;s Your Package Summary
+			</div>
+			@each(subscription in data.subscriptions)
+				<div class="package-warp">{{subscription.package_name_reference}}</div>
+				@if(subscription.type=='Main Plan')
+					<table class="table-color">
+						<tr>
+							<td>1x My Plan</td>
+							<td style="text-align: right">{{trial? "":currency(subscription.total)}}</td>
+						</tr>
+					</table>
+				@else
+					<table class="table-color">
+						<tr>
+							<td>1x Family Plan</td>
+							<td style="text-align: right">{{trial?"":currency(subscription.total)}}</td>
+						</tr>
+					</table>
+				@endif
+				<div  class="bold pb10">1 Month Subscription</div>
+				<div class="bold pb10">{{subscription.address_name}}</div>
+				<div class="address pb10">
+					<div>{{subscription.address}}</div>
+					<div>{{subscription.village}}, {{subscription.district}}</div>
+					<div>{{subscription.city}} - {{subscription.province}} {{subscription.zipcode}}</div>
+	
+				</div>
+				<ol type="1">
+				@each(schedule in subscription.subscription_schedule)
+					<li class="bold">{{moment(schedule.schedule_date).format('ddd, MMM Do YY')}}</li>
+					<ul>
+						@each(product in schedule.group.group_products)
+							<li>{{product.product.name}}</li>
+						@endeach
+					</ul>
+				@endeach
+			</ol>
+			@endeach
+			<table class="table-color" style="border-top-style:solid;border-top-width: 1px;border-top-color:black">
+				<tr>
+					<td>TOTAL</td>
+					<td style="text-align: right">{{trial?"":currency(data.total_price)}}</td>
+				</tr>
+			</table>
+
+			@if(data.benefit)
+				<div class="benefit">
+					<div class="title">Enjoy your “Executive Baker” benefit</div>
+					<p>Here&#180;s a discount for you!</p>
+					<img src="cid:voucher" alt="">
+				</div>
+			@endif
+		</div>
+		@include('mail.footer')
+	</div>
+	
+
+	
+
+	
+</body>
+</html>

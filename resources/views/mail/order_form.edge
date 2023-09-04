@@ -1,0 +1,22 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+	<meta charset="UTF-8">
+	<meta name="viewport" content="width=device-width, initial-scale=1.0">
+	<meta http-equiv="X-UA-Compatible" content="ie=edge">
+	<title>Order Form File</title>
+	@include('include.css')
+</head>
+<body>
+	<div>Hello,</div><br />
+		
+	<div>You have requested order form file for :</div>
+	<div>Campaign id : <strong>{{campaign_id}}</strong></div>
+	<div>Operator name : <strong>{{ms_operator_name}}</strong></div>
+	<div>Product type : <strong>{{product_identifier}}</strong></div><br /><br />
+	
+	<div>Please take a look at the attachment files for details.</div><br /><br />
+	
+	@include('include.footer')
+</body>
+</html>

@@ -1,0 +1,152 @@
+@font-face{
+	font-family:"Bakery";
+   src:url("../../../assets/font/Bakery.woff") format("woff"),url("../../../assets/font/Bakery.ttf") format("truetype");
+}
+*[data-ico-bakery]:before{
+	font-family:Bakery;
+   content:attr(data-ico-bakery);
+}
+@font-face{
+	font-family:"Basic";
+   src:url("../../../assets/font/Basic.woff") format("woff"),url("../../../assets/font/Basic.ttf") format("truetype");
+}
+*[data-ico-basic]:before{
+	font-family:Basic;
+   content:attr(data-ico-basic);
+}
+@font-face{
+	font-family:"Business";
+   src:url("../../../assets/font/Business.woff") format("woff"),url("../../../assets/font/Business.ttf") format("truetype");
+}
+*[data-ico-business]:before{
+	font-family:Business;
+   content:attr(data-ico-business);
+}
+@font-face{
+	font-family:"Construction";
+   src:url("../../../assets/font/Construction.woff") format("woff"),url("../../../assets/font/Construction.ttf") format("truetype");
+}
+*[data-ico-construction]:before{
+	font-family:Construction;
+   content:attr(data-ico-construction);
+}
+@font-face{
+	font-family:"Design";
+   src:url("../../../assets/font/Design.woff") format("woff"),url("../../../assets/font/Design.ttf") format("truetype");
+}
+*[data-ico-design]:before{
+	font-family:Design;
+   content:attr(data-ico-design);
+}
+@font-face{
+	font-family:"Development";
+   src:url("../../../assets/font/Development.woff") format("woff"),url("../../../assets/font/Development.ttf") format("truetype");
+}
+*[data-ico-development]:before{
+	font-family:Development;
+   content:attr(data-ico-development);
+}
+@font-face{
+	font-family:"Essential";
+   src:url("../../../assets/font/Essential.woff") format("woff"),url("../../../assets/font/Essential.ttf") format("truetype");
+}
+*[data-ico-essential]:before{
+	font-family:Essential;
+   content:attr(data-ico-essential);
+}
+@font-face{
+	font-family:"FontAwesome";
+   src:url("../../../assets/font/FontAwesome.woff") format("woff"),url("../../../assets/font/FontAwesome.ttf") format("truetype");
+}
+*[data-ico-fontawesome]:before{
+	font-family:FontAwesome;
+   content:attr(data-ico-fontawesome);
+}
+@font-face{
+	font-family:"FontAwesome5Brands";
+   src:url("../../../assets/font/FontAwesome5Brands.woff") format("woff"),url("../../../assets/font/FontAwesome5Brands.ttf") format("truetype");
+}
+*[data-ico-fontawesome5brands]:before{
+	font-family:FontAwesome5Brands;
+   content:attr(data-ico-fontawesome5brands);
+}
+@font-face{
+	font-family:"FontAwesome5Regular";
+   src:url("http://pastry.bold-themes.com/main-demo/wp-content/themes/pastry-love/fonts/FontAwesome5Regular/FontAwesome5Regular.woff") format("woff"),url("http://pastry.bold-themes.com/main-demo/wp-content/themes/pastry-love/fonts/FontAwesome5Regular/FontAwesome5Regular.ttf") format("truetype");
+}
+*[data-ico-fontawesome5regular]:before{
+	font-family:FontAwesome5Regular;
+   content:attr(data-ico-fontawesome5regular);
+}
+@font-face{
+	font-family:"FontAwesome5Solid";
+   src:url("http://pastry.bold-themes.com/main-demo/wp-content/themes/pastry-love/fonts/FontAwesome5Solid/FontAwesome5Solid.woff") format("woff"),url("http://pastry.bold-themes.com/main-demo/wp-content/themes/pastry-love/fonts/FontAwesome5Solid/FontAwesome5Solid.ttf") format("truetype");
+}
+*[data-ico-fontawesome5solid]:before{
+	font-family:FontAwesome5Solid;
+   content:attr(data-ico-fontawesome5solid);
+}
+@font-face{
+	font-family:"Icon7Stroke";
+   src:url("../../../assets/font/Icon7Stroke.woff") format("woff"),url("../../../assets/font/Icon7Stroke.ttf") format("truetype");
+}
+*[data-ico-icon7stroke]:before{
+	font-family:Icon7Stroke;
+   content:attr(data-ico-icon7stroke);
+}
+@font-face{
+	font-family:"Leather";
+   src:url("http://pastry.bold-themes.com/main-demo/wp-content/themes/pastry-love/fonts/Leather/Leather.woff") format("woff"),url("http://pastry.bold-themes.com/main-demo/wp-content/themes/pastry-love/fonts/Leather/Leather.ttf") format("truetype");
+}
+*[data-ico-leather]:before{
+	font-family:Leather;
+   content:attr(data-ico-leather);
+}
+@font-face{
+	font-family:"Nature";
+   src:url("http://pastry.bold-themes.com/main-demo/wp-content/themes/pastry-love/fonts/Nature/Nature.woff") format("woff"),url("http://pastry.bold-themes.com/main-demo/wp-content/themes/pastry-love/fonts/Nature/Nature.ttf") format("truetype");
+}
+*[data-ico-nature]:before{
+	font-family:Nature;
+   content:attr(data-ico-nature);
+}
+@font-face{
+	font-family:"Oktoberfest";
+   src:url("http://pastry.bold-themes.com/main-demo/wp-content/themes/pastry-love/fonts/Oktoberfest/Oktoberfest.woff") format("woff"),url("http://pastry.bold-themes.com/main-demo/wp-content/themes/pastry-love/fonts/Oktoberfest/Oktoberfest.ttf") format("truetype");
+}
+*[data-ico-oktoberfest]:before{
+	font-family:Oktoberfest;
+   content:attr(data-ico-oktoberfest);
+}
+@font-face{
+	font-family:"Productivity";
+   src:url("http://pastry.bold-themes.com/main-demo/wp-content/themes/pastry-love/fonts/Productivity/Productivity.woff") format("woff"),url("http://pastry.bold-themes.com/main-demo/wp-content/themes/pastry-love/fonts/Productivity/Productivity.ttf") format("truetype");
+}
+*[data-ico-productivity]:before{
+	font-family:Productivity;
+   content:attr(data-ico-productivity);
+}
+@font-face{
+	font-family:"Science";
+   src:url("http://pastry.bold-themes.com/main-demo/wp-content/themes/pastry-love/fonts/Science/Science.woff") format("woff"),url("http://pastry.bold-themes.com/main-demo/wp-content/themes/pastry-love/fonts/Science/Science.ttf") format("truetype");
+}
+*[data-ico-science]:before{
+	font-family:Science;
+   content:attr(data-ico-science);
+}
+@font-face{
+	font-family:"Tools";
+   src:url("http://pastry.bold-themes.com/main-demo/wp-content/themes/pastry-love/fonts/Tools/Tools.woff") format("woff"),url("http://pastry.bold-themes.com/main-demo/wp-content/themes/pastry-love/fonts/Tools/Tools.ttf") format("truetype");
+}
+*[data-ico-tools]:before{
+	font-family:Tools;
+   content:attr(data-ico-tools);
+}
+@font-face{
+	font-family:"Transportation";
+   src:url("http://pastry.bold-themes.com/main-demo/wp-content/themes/pastry-love/fonts/Transportation/Transportation.woff") format("woff"),url("http://pastry.bold-themes.com/main-demo/wp-content/themes/pastry-love/fonts/Transportation/Transportation.ttf") format("truetype");
+}
+*[data-ico-transportation]:before{
+	font-family:Transportation;
+   content:attr(data-ico-transportation);
+}

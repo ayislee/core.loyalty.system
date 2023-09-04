@@ -1,0 +1,23 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+	<meta charset="UTF-8">
+	<meta name="viewport" content="width=device-width, initial-scale=1.0">
+	<meta http-equiv="X-UA-Compatible" content="ie=edge">
+	<title>Verify Sender Email</title>
+	@include('include.css')
+</head>
+<body>
+	<div>Hello, {{recipient_name}}</div><br />
+
+	<div>You have created a new sender using {{recipient_email}} as the email address.</div>
+	<div>Please visit the link below before the expired time ({{expired_time}}) to verify your email :</div>
+	<div><a href='{{link}}'>{{link}}</a></div><br />
+
+	@if(referrer === "eventories")
+		@include('include.footer_eventories')
+	@else
+		@include('include.footer')
+	@endif
+</body>
+</html>

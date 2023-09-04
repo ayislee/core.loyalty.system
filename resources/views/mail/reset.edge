@@ -1,0 +1,23 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+	<meta charset="UTF-8">
+	<meta name="viewport" content="width=device-width, initial-scale=1.0">
+	<meta http-equiv="X-UA-Compatible" content="ie=edge">
+	<title>Reset Password</title>
+	@include('include.css')
+</head>
+<body>
+	<div>Hello, {{recipient_name}}</div><br />
+
+	<div>Please complete your new MediaCartz account by setting up your password.</div>
+	<div>You can visit the link below before the expired time ({{expired_time}}) :</div><br />
+	<div><a href='{{link}}'>{{link}}</a></div><br />
+
+	@if(referrer === "eventories")
+		@include('include.footer_eventories')
+	@else
+		@include('include.footer')
+	@endif
+</body>
+</html>

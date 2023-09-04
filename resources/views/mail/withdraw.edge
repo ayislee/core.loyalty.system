@@ -1,0 +1,20 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+	<meta charset="UTF-8">
+	<meta name="viewport" content="width=device-width, initial-scale=1.0">
+	<meta http-equiv="X-UA-Compatible" content="ie=edge">
+	<title>Request withdraw</title>
+	@include('include.css')
+</head>
+<body>
+	<div>Hello, {{recipient_name}}</div><br />
+
+	<div>
+        You submit a referral fund withdrawal of {{currency(value)}}. We will process your application as soon as possible
+	</div>
+
+
+    @include('include.footer')
+</body>
+</html>
