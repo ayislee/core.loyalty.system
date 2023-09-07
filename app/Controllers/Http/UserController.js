@@ -7,7 +7,6 @@ class UserController {
         let users, partner_id
         if(auth.user.type === 'admin') {
             users = await User.query()
-            .select('users.user_id')
             .with('UserPartner',(build)=>{
                 build.with('partner')
             })

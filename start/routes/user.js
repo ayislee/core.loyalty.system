@@ -6,6 +6,7 @@ const prefix='/api/v1/admin/users'
 
 Route.group(()=>{
     Route.get('/','UserController.gets').validator('Pages')
+    Route.get('/get','UserController.get').validator('UserID')
     Route.get('/all','UserController.all')
     Route.post('/', 'UserController.create').validator('User')
     Route.put('/', 'UserController.edit')
