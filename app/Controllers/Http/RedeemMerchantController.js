@@ -21,6 +21,25 @@ class RedeemMerchantController {
         })
     }
 
+    async get({request, response, auth}) {
+        const data = RedeemMerchant.query()
+        .with('partner')
+        if(auth.user.type !== 'admin'){
+            const pid = await Lib.getPartnerIDFromUser(auth.user.user_id)
+            if(pid){
+                data.where('partner_id',pid)
+            }else{
+                data.where('partner_id',null)
+            }
+        }
+
+        const out = await data.where('redeem_merchant_id', request.all().redeem_merchant_id).first()
+        return response.json({
+            status: true,
+            data: out
+        })
+    }
+
     async create({request, response, auth}) {
         
         const data = new RedeemMerchant()

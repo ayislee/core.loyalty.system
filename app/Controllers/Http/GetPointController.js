@@ -27,6 +27,31 @@ class GetPointController {
         })
     }
 
+    async get({request, response, auth}) {
+        let partner_id = null
+        const data = GetPoint.query()
+        .filter(request.all().filter)
+        .order(request.all().order)
+        .with('partner')
+
+        if(auth.user.type !== 'admin') {
+            const userPartner = await Userpartner.query().where('user_id',auth.user.user_id).first()
+            if(userPartner){
+                partner_id = userPartner.partner_id    
+            }else{
+                partner_id = ''
+            }
+            data.where('partner_id',partner_id)
+        }
+
+        const out = await data.where('get_point_id',request.all().get_point_id).first()
+        return response.json({
+            status: true,
+            data: out
+        })
+    }
+
+
     async create({request, response, auth}) {
         // validate code
         const validate = await GetPoint.query()

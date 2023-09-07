@@ -6,6 +6,7 @@ const prefix='/api/v1/admin/getpoints'
 
 Route.group(()=>{
     Route.get('/','GetPointController.gets').validator('Pages')
+    Route.get('/get','GetPointController.get').validator('GetpointID')
     Route.post('/','GetPointController.create').middleware(['HasPartner']).validator('GetPoint').validator('PartnerID')
     Route.put('/','GetPointController.edit').middleware(['HasPartner']).validator('GetPoint').validator('GetpointID')
     
