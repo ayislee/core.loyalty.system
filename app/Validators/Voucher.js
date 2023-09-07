@@ -6,6 +6,7 @@ class Voucher {
 			name: "required",
 			sku: "required",
             product_image: "required",
+			voucher_image: "required",
             status: "required|in:active,not active",
 			description: "required",
             duration: "required|number"

@@ -49,6 +49,7 @@ class VoucherController {
         voucher.description = request.all().description
         voucher.duration = request.all().duration
         voucher.product_image = request.all().product_image
+        voucher.voucher_image = request.all().voucher_image
         voucher.number_point = request.all().number_point
         voucher.created_by = auth.user.user_id
         voucher.updated_by = auth.user.user_id
@@ -80,6 +81,7 @@ class VoucherController {
         data.name = request.all().name ? request.all().name : data.name
         data.sku = request.all().sku ? request.all().sku : data.sku
         data.product_image = request.all().product_image ? request.all().product_image : data.product_image
+        data.voucher_image = request.all().voucher_image ? request.all().voucher_image : data.voucher_image
         data.number_point = request.all().number_point ? request.all().number_point : data.number_point
         data.status = request.all().status ? request.all().status : data.status
         data.description = request.all().description ? request.all().description : data.description

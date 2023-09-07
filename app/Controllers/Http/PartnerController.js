@@ -40,6 +40,39 @@ class PartnerController {
         
     }
 
+    async get({request, response, auth}) {
+        let partner_id = null
+        let partner
+        if(auth.user.type === 'admin'){
+            partner = await Partner.query()
+            .filter(request.all().filter)
+            .order(request.all().order)
+            .where('partner_id',request.all().partner_id)
+            .first()
+            return response.json({
+                status: true,
+                data: partner
+            })
+        }else{
+            const userPartner = await Userpartner.query().where('user_id',auth.user.user_id).first()
+            if(userPartner){
+                partner_id = userPartner.partner_id    
+            }else{
+                partner_id = ''
+            }
+            
+            partner = await Partner.query()
+            .filter(request.all().filter)
+            .order(request.all().order)
+            .where('partner_id',partner_id)
+            .first()
+            return response.json({
+                status: true,
+                data: partner
+            })
+        }
+    }
+
     async create({request, response, auth}) {
         var server_id = randomToken(64);
         var client_id = randomToken(64);

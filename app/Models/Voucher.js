@@ -17,7 +17,10 @@ class Voucher extends Model {
         this.addTrait('@provider:Lucid/SoftDeletes')
         this.addTrait('Filter')
 		this.addTrait('OrderBy')
-        
+
+        this.addGlobalScope((build)=>{
+			build.with('partner')
+		})
         
     }
 

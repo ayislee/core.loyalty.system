@@ -23,6 +23,14 @@ class Partner extends Model {
         this.addTrait('@provider:Lucid/SoftDeletes')
         this.addTrait('Filter')
 		this.addTrait('OrderBy')
+
+        this.addGlobalScope((build)=>{
+			build.with('redeem_merchants')
+		})
+    }
+
+    redeem_merchants() {
+        return this.hasMany('App/Models/RedeemMerchant','partner_id','partner_id')
     }
 }
 

@@ -8,6 +8,7 @@ const prefix='/api/v1/admin/partner'
 
 Route.group(()=>{
     Route.get('/','PartnerController.gets')
+    Route.get('/get','PartnerController.get').validator('PartnerID')
     Route.post('/','PartnerController.create').validator('Partner')
     Route.put('/','PartnerController.edit')
     .middleware(['HasPartner'])
