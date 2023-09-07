@@ -67,6 +67,38 @@ class UserController {
         })
 
     }
+
+    async get({auth, request, response}) {
+        let user, userPartner, userPartners, partner_id, users
+        if(auth.user.type === 'admin'){
+            user = await User.query().where('user_id', request.all().user_id).first()
+            return response.json({
+                status: true,
+                data: user
+            })
+        } else {
+            userPartner = await UserPartner.query().where('user_id',auth.user.user_id).first();
+            partner_id = userPartner.partner_id
+            userPartners = await UserPartner.query().where('partner_id',partner_id).fetch();
+            users = [];
+            for (const iterator of userPartners.rows) {
+                users.push(iterator.user_id)
+            }
+            if(auth.user.is_owner === 'yes'){
+                user = await User.query().whereIn('user_id',users).where('user_id',request.all().user_id).first()
+                return response.json({
+                    status: true,
+                    data: user
+                })
+            }else{
+                user = await User.query().whereIn('user_id',users).where('user_id',auth.user.user_id).first()
+                return response.json({
+                    status: true,
+                    data: user
+                })
+            }
+        }
+    }
     
     async create({auth, request, response}) {
         let trx, user

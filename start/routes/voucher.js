@@ -6,6 +6,7 @@ const prefix='/api/v1/admin/vouchers'
 
 Route.group(()=>{
     Route.get('/','VoucherController.gets').validator('Pages')
+    Route.get('/get','VoucherController.get').validator('VoucherID')
     Route.post('/','VoucherController.create').validator('PartnerID').validator('Voucher')
     Route.put('/','VoucherController.edit')
     .middleware(['HasPartner','ValidateVoucher'])

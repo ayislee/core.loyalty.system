@@ -40,6 +40,38 @@ class VoucherController {
         
     }
 
+    async get({request, response, auth}) {
+        let pid
+        const data = Voucher.query()
+        .with('partner')
+        .with('created')
+        .with('updated')
+        .filter(request.all().filter)
+        .order(request.all().order)
+        if(auth.user.type === 'partner'){
+            // partner's voucher
+            pid = await ThisLib.getPartnerIDFromUser(auth.user.user_id)
+            if(pid){
+                data.where('partner_id', pid)
+            }else{
+                return response.json({
+                    status: true,
+                    data: {
+                        total: 0,
+                        perPage: request.all().rows,
+                        page: 1,
+                        lastPage: 0,
+                    }
+                })
+            }
+        }
+        const out = await data.where('voucher_id',request.all().voucher_id).first()
+        return response.json({
+            status: true,
+            data: out
+        })
+    }
+
     async create({request, response, auth}) {
         let pid
         const voucher = new Voucher()
