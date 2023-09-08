@@ -11,3 +11,12 @@ Route.group(()=>{
     Route.post('/redeem','MemberController.redeem').validator('VoucherID')
     Route.get('/redeem/voucher','MemberController.redeem_voucher').validator('Pages')
 }).prefix(prefix).middleware(['auth:token'])
+
+
+const prefix2='/api/v1/admin/member'
+Route.group(()=>{
+    Route.get('/','MemberController.gets').validator('Pages')
+    Route.get('/get','MemberController.get').validator('MemberID')
+    Route.get('/points','MemberController.member_points').validator('MemberID').validator('Pages')
+    Route.get('/vouchers','MemberController.member_vouchers').validator('MemberID').validator('Pages')
+}).prefix(prefix2).middleware(['auth:jwt'])

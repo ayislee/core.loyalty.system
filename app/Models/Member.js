@@ -39,6 +39,8 @@ class Member extends Model {
         */
 
         this.addTrait('@provider:Lucid/SoftDeletes')
+        this.addTrait('Filter')
+		this.addTrait('OrderBy')
         
         this.addHook('beforeSave', async (userInstance) => {
             if (userInstance.dirty.password) {

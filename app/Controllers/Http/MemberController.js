@@ -239,6 +239,61 @@ class MemberController {
         }
 
     }
+
+    // Admin Member
+    async gets({request, response, auth}) {
+        const data = await Member.query()
+        .filter(request.all().filter)
+        .order(request.all().filter)
+        .paginate(request.all().page, request.all().rows)
+
+        return response.json({
+            ststus: true,
+            data : data
+        })
+    }
+
+    async get({request, response, auth}) {
+        const data = await Member.query()
+        .where('member_id',request.all().member_id)
+        .filter(request.all().filter)
+        .order(request.all().filter)
+        .first()
+
+        return response.json({
+            ststus: true,
+            data : data
+        })
+    }
+
+    async member_points({request, response, auth}) {
+        const data = await PointHistory.query()
+        .where('member_id',request.all().member_id)
+        .with('member')
+        .filter(request.all().filter)
+        .order(request.all().order)
+        .orderBy('point_history_id','desc')
+        .paginate(request.all().page, request.all().rows)
+
+        return response.json({
+            status: true,
+            data: data
+        })
+    }
+
+    async member_vouchers({request, response, auth}) {
+        const data = await MemberVoucher.query()
+        .with('voucher')
+        .with('member')
+        .where('member_id', request.all().member_id)
+        // .where('expire_date','>',moment().format('YYYY-MM-DD HH:mm:ss'))
+        // .where('used','0')
+        .paginate(request.all().page, request.all().rows)
+        return response.json({
+            status: true,
+            data: data
+        })
+    }
 }
 
 module.exports = MemberController
