@@ -248,7 +248,7 @@ class MemberController {
         .paginate(request.all().page, request.all().rows)
 
         return response.json({
-            ststus: true,
+            status: true,
             data : data
         })
     }
@@ -261,7 +261,7 @@ class MemberController {
         .first()
 
         return response.json({
-            ststus: true,
+            status: true,
             data : data
         })
     }
