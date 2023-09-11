@@ -84,6 +84,7 @@ class PartnerController {
                 partner.name = request.all().name
                 partner.desc = request.all().desc
                 partner.howtogetpoint = request.all().howtogetpoint
+                partner.logo = request.all().logo
                 partner.server_id = server_id
                 partner.client_id = client_id
                 await partner.save()
@@ -110,6 +111,7 @@ class PartnerController {
                         partner.name = request.all().name
                         partner.desc = request.all().desc
                         partner.howtogetpoint = request.all().howtogetpoint
+                        partner.logo = request.all().logo
                         partner.server_id = server_id
                         partner.client_id = client_id    
                         await partner.save(trx)
@@ -153,6 +155,7 @@ class PartnerController {
         data.name = request.all().name
         data.desc = request.all().desc
         data.howtogetpoint = request.all().howtogetpoint
+        partner.logo = request.all().logo
         await data.save()
         return response.json({
             status: true,
