@@ -82,8 +82,10 @@ class PartnerController {
             try {
                 partner = new Partner()
                 partner.name = request.all().name
+                partner.desc = request.all().desc
+                partner.howtogetpoint = request.all().howtogetpoint
                 partner.server_id = server_id
-                partner.client_id = client_id    
+                partner.client_id = client_id
                 await partner.save()
                 return response.json({
                     status: true,
@@ -106,6 +108,8 @@ class PartnerController {
                         
                         partner = new Partner()
                         partner.name = request.all().name
+                        partner.desc = request.all().desc
+                        partner.howtogetpoint = request.all().howtogetpoint
                         partner.server_id = server_id
                         partner.client_id = client_id    
                         await partner.save(trx)
@@ -147,10 +151,25 @@ class PartnerController {
     async edit({request, response, auth}) {
         const data = await Partner.query().where('partner_id',request.all().partner_id).first()
         data.name = request.all().name
+        data.desc = request.all().desc
+        data.howtogetpoint = request.all().howtogetpoint
         await data.save()
         return response.json({
             status: true,
             message: "success",
+            data: data
+        })
+    }
+
+    async all({request, response}) {
+        const data = await Partner.query()
+        .select('name','partner_id','logo','desc','howtogetpoint')
+        .filter(request.all().filter)
+        .order(request.all().order)
+        .paginate(request.all().page, request.all().rows)
+
+        return response.json({
+            status: true,
             data: data
         })
     }

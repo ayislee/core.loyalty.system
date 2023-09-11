@@ -10,6 +10,7 @@ Route.group(()=>{
     Route.get('/vouchers','MemberController.vouchers').validator('Pages')
     Route.post('/redeem','MemberController.redeem').validator('VoucherID')
     Route.get('/redeem/voucher','MemberController.redeem_voucher').validator('Pages')
+    Route.get('/partner','PartnerController.all').validator('Pages')
 }).prefix(prefix).middleware(['auth:token'])
 
 

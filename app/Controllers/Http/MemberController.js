@@ -12,6 +12,7 @@ const Database = use('Database')
 const Event = use('Event')
 const moment = use('moment')
 
+
 class MemberController {
     async register({request, response}) {
         let member 
@@ -152,7 +153,7 @@ class MemberController {
             })
         }
 
-        if(voucher.number_point > point.ponit) {
+        if(voucher.number_point > point.point) {
             return response.json({
                 status: false,
                 message: 'Yout point not enough'
