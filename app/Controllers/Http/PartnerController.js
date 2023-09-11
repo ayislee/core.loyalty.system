@@ -155,7 +155,7 @@ class PartnerController {
         data.name = request.all().name
         data.desc = request.all().desc
         data.howtogetpoint = request.all().howtogetpoint
-        partner.logo = request.all().logo
+        data.logo = request.all().logo
         await data.save()
         return response.json({
             status: true,
@@ -170,6 +170,18 @@ class PartnerController {
         .filter(request.all().filter)
         .order(request.all().order)
         .paginate(request.all().page, request.all().rows)
+
+        return response.json({
+            status: true,
+            data: data
+        })
+    }
+
+    async detail({request, response}) {
+        const data = await Partner.query()
+        .select('name','partner_id','logo','desc','howtogetpoint')
+        .where('partner_id', request.all().partner_id)
+        .first()
 
         return response.json({
             status: true,

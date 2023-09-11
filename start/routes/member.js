@@ -11,6 +11,7 @@ Route.group(()=>{
     Route.post('/redeem','MemberController.redeem').validator('VoucherID')
     Route.get('/redeem/voucher','MemberController.redeem_voucher').validator('Pages')
     Route.get('/partner','PartnerController.all').validator('Pages')
+    Route.get('/partner/detail','PartnerController.detail').validator('PartnerID')
 }).prefix(prefix).middleware(['auth:token'])
 
 
