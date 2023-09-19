@@ -6,6 +6,7 @@ const Env = use('Env')
 const prefix='/api/v1/member'
 Route.group(()=>{
     Route.get('/profile','MemberController.profile')
+    Route.put('/profile','MemberController.profile_update').validator('MemberID')
     Route.get('/points','MemberController.points').validator('Pages')
     Route.get('/vouchers','MemberController.vouchers').validator('Pages')
     Route.post('/redeem','MemberController.redeem').validator('VoucherID')

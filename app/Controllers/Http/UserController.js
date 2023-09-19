@@ -71,7 +71,11 @@ class UserController {
     async get({auth, request, response}) {
         let user, userPartner, userPartners, partner_id, users
         if(auth.user.type === 'admin'){
-            user = await User.query().where('user_id', request.all().user_id).first()
+            user = await User.query().where('user_id', request.all().user_id)
+            .with('UserPartner',(build)=>{
+                build.with('partner')
+            })
+            .first()
             return response.json({
                 status: true,
                 data: user
@@ -85,13 +89,21 @@ class UserController {
                 users.push(iterator.user_id)
             }
             if(auth.user.is_owner === 'yes'){
-                user = await User.query().whereIn('user_id',users).where('user_id',request.all().user_id).first()
+                user = await User.query().whereIn('user_id',users).where('user_id',request.all().user_id)
+                .with('UserPartner',(build)=>{
+                    build.with('partner')
+                })
+                .first()
                 return response.json({
                     status: true,
                     data: user
                 })
             }else{
-                user = await User.query().whereIn('user_id',users).where('user_id',auth.user.user_id).first()
+                user = await User.query().whereIn('user_id',users).where('user_id',auth.user.user_id)
+                .with('UserPartner',(build)=>{
+                    build.with('partner')
+                })
+                .first()
                 return response.json({
                     status: true,
                     data: user

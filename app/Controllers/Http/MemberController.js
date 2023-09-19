@@ -115,6 +115,28 @@ class MemberController {
         })
     }
 
+    async profile_update({request, response, auth}){
+
+        const data = await Member.query()
+        .where('member_id',auth.user.member_id)
+        .with('point')
+        .first()
+
+        data.email = request.all().email ? request.all().email : data.email
+        data.firstname = request.all().firstname ? request.all().firstname : data.firstname
+        data.lastname = request.all().lastname ? request.all().lastname : data.lastname
+        data.image_profile = request.all().image_profile ? request.all().image_profile : data.image_profile
+
+        await data.save()
+
+        return response.json({
+            status: true,
+            message: "success",
+            data: data
+        })
+    }
+
+
     async points({request, response, auth}) {
         const data = await PointHistory.query()
         .where('member_id',auth.user.member_id)
