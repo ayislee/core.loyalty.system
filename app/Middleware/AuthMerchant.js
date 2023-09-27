@@ -18,7 +18,7 @@ class AuthMerchant {
                 message: 'cid is required'
             })
         }
-
+        
         const partner = await Partner.query().where('server_id', request.all().sid).where('client_id',request.all().cid).first()
         if(!partner) {
             return response.json({

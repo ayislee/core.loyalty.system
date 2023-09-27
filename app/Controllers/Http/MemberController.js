@@ -31,7 +31,7 @@ class MemberController {
                 await member.save()
 
                 // kirim pesan melalui whatsapp
-                Event.fire('new::member', member)
+                Event.fire('new::member', member.toJSON())
 
                 return response.json({
                     status : true,
@@ -51,19 +51,6 @@ class MemberController {
 
     async sendpoint({request, response}) {
         // return response.json(request.all())
-        const getPoint = await GetPoint.query()
-        .where('partner_id',request.all().partner_id)
-        .where('code',request.all().code)
-        .with('partner')
-        .first()
-
-        if(!getPoint){
-            return response.json({
-                status: false,
-                message: 'invalid code'
-            })
-        }
-
         const member = await Member.query().where('phone',request.all().phone).first()
         if(!member){
             return response.json({
@@ -74,7 +61,9 @@ class MemberController {
 
         const data = {
             member:member.toJSON(),
-            getPoint:getPoint.toJSON()
+            point:request.all().point,
+            description: request.all().description,
+            partner_id: request.all().partner_id
         }
         Event.fire('sendpoint::member', data)
         return response.json({

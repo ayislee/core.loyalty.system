@@ -44,8 +44,8 @@ hooks.after.providersBooted(() => {
 		let min = Math.min(args[0],args[1])
 		let max = Math.max(args[0],args[1])
 
-		console.log("Minimum--"+min)
-		console.log("Minimum--"+max)
+		// console.log("Minimum--"+min)
+		// console.log("Minimum--"+max)
 
 		if(value < min || value > max){
 			throw message
@@ -56,12 +56,12 @@ hooks.after.providersBooted(() => {
 
 
     const msisdnFn = async(data, field, message, args, get) =>{
-        console.log('validator data',data)
-        console.log('validator field',field)
-        console.log('validator args',args)
+        // console.log('validator data',data)
+        // console.log('validator field',field)
+        // console.log('validator args',args)
 
         let value = get(data, field)
-        console.log('validator value',value)
+        // console.log('validator value',value)
         if (!value) {
             return
         }

@@ -52,6 +52,7 @@ const namedMiddleware = {
   ValidatePartner: 'App/Middleware/ValidatePartner',
   FilterPartner: 'App/Middleware/FilterPartner',
   AuthMerchant :'App/Middleware/AuthMerchant',
+  ConvertPhone: 'App/Middleware/ConvertPhone',
 }
 
 /*
