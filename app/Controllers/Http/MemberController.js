@@ -11,7 +11,7 @@ const RedeemMerchant = use('App/Models/RedeemMerchant')
 const Database = use('Database')
 const Event = use('Event')
 const moment = use('moment')
-
+const CryptoJS = require("crypto-js");
 
 class MemberController {
     async register({request, response}) {
@@ -89,13 +89,42 @@ class MemberController {
 
     }
 
+    async getvoucher({request, response}) {
+        // return request.all()
+        // Decrypt
+        try {
+            var bytes  = CryptoJS.AES.decrypt(request.all().code, request.all().sid);
+            // console.log(bytes)
+            var originalText = bytes.toString(CryptoJS.enc.Utf8);
+            if(originalText === '') throw "500"
+            const mv = await MemberVoucher.query().where('member_voucher_id',originalText).where('used','0')
+            .with('voucher')
+            .with('member')
+            .first()
+            return response.json({
+                status: true,
+                data: mv
+            })
+                
+        } catch (error) {
+            console.log(error)
+            return response.json({
+                status: false,
+                message: 'invalid voucher'
+            })            
+        }
+        
+        
+    }
+
     async profile({request, response, auth}){
 
         const data = await Member.query()
         .where('member_id',auth.user.member_id)
         .with('point')
         .with('member_voucher',(build)=>{
-            build.with('voucher')
+            build.with('voucher').where('member_vouchers.used','0')
+            .where('expire_date','>',moment().format('YYYY-MM-DD HH:mm:ss'))
         })
         .first()
         return response.json({

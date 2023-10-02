@@ -21,7 +21,7 @@ class Member extends Model {
     }
 
     getTokenValidUntil(token_valid_until){
-        console.log('t',token_valid_until)
+        // console.log('t',token_valid_until)
         if(token_valid_until){
             return moment(token_valid_until).format("YYYY-MM-DD HH:mm:ss")
         }else{
