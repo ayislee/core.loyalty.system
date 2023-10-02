@@ -1,4 +1,7 @@
 "use strict";
+
+const Voucher = use("App/Models/Voucher");
+
 const Event = use('Event')
 const PointHistory = use('App/Models/PointHistory')
 const Point = use('App/Models/Point')
@@ -51,14 +54,17 @@ Event.on('sendpoint::member', async (data) => {
 })
 
 
-Event.on('whatsapp::member', async (data) => {
+Event.on('token::member', async (data) => {
     console.log(data)
+    
 })
 
 Event.on('redeem::member', async (data) => {
     console.log(data)
     const trx = await Database.beginTransaction()
     try {
+
+        
         const pH = new PointHistory()
         pH.member_id = data.point.member_id
         pH.ref_id = uuid.v4()
@@ -71,6 +77,7 @@ Event.on('redeem::member', async (data) => {
         mVoucher.voucher_id = data.voucher.voucher_id
         mVoucher.voucher_code = uuid.v4()
         mVoucher.expire_date = moment().add(data.voucher.duration,'days').format('YYYY-MM-DD HH:mm:ss')
+        mVoucher.amount = parseFloat(Env.get('POINT')) * data.voucher.number_point
         await mVoucher.save(trx)
         await trx.commit()
         console.log('success')

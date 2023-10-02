@@ -85,6 +85,7 @@ class VoucherController {
         voucher.number_point = request.all().number_point
         voucher.created_by = auth.user.user_id
         voucher.updated_by = auth.user.user_id
+        voucher.type = request.all().type
 
         if(auth.user.type === 'admin'){
             voucher.partner_id = request.all().partner_id
@@ -118,6 +119,7 @@ class VoucherController {
         data.status = request.all().status ? request.all().status : data.status
         data.description = request.all().description ? request.all().description : data.description
         data.duration = request.all().duration ? request.all().duration : data.duration
+        data.type = request.all().type ? request.all().type : data.type
         await data.save()
 
         return response.json({

@@ -9,7 +9,8 @@ class Voucher {
 			voucher_image: "required",
             status: "required|in:active,not active",
 			description: "required",
-            duration: "required|number"
+            duration: "required|number",
+			type: "required|in:free,amount"
 		}
 	}
 
