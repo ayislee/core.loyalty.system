@@ -185,6 +185,12 @@ class MemberController {
 
     async redeem({request,response, auth}){
         const point = await Point.query().where('member_id',auth.user.member_id).first()
+        if(!point) {
+            return response.json({
+                status: false,
+                message: 'Yout point not enough'
+            })
+        }
         const voucher = await Voucher.query().where('status','active').where('voucher_id', request.all().voucher_id).first()
         if(!voucher) {
             return response.json({
