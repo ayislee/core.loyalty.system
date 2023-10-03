@@ -115,7 +115,7 @@ class AuthController {
 
         member.token = token
         await member.save()
-        Event.fire('whatsapp::member', {member: member.toJSON(),token:token.toString()})
+        Event.fire('token::member', {member: member.toJSON(),token:token.toString()})
         return response.json({
             status: true,
             message: `Token already send valid in ${Env.get('TOKEN_VALIDITY_PERIODE')} minute(s)`
