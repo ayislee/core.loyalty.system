@@ -7,7 +7,7 @@ class RedeemMerchantSchema extends Schema {
     up() {
         this.table('redeem_merchants', (table) => {
             // alter table
-            table.integer('store_id')
+            table.string('store_id')
             table.unique(['store_id','partner_id'])
         })
     }
