@@ -67,6 +67,7 @@ class RedeemMerchantController {
         data.phone = request.all().phone ? request.all().phone : data.phone
         data.lat = request.all().lat ? request.all().lat : data.lat
         data.long = request.all().long ? request.all().long : data.long
+        data.store_id = request.all().store_id ? request.all().store_id : data.store_id
         await data.save()
         return response.json({
             status: true,
