@@ -49,6 +49,8 @@ class RedeemMerchantController {
         data.long = request.all().long
         data.phone = request.all().phone
         data.partner_id = request.all().partner_id
+        data.store_id = request.all().store_id
+
         await data.save()
 
         return response.json({
