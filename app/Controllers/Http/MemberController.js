@@ -12,6 +12,7 @@ const Database = use('Database')
 const Event = use('Event')
 const moment = use('moment')
 const CryptoJS = require("crypto-js");
+const Partner = use('App/Models/Partner')
 
 class MemberController {
     async register({request, response}) {
@@ -59,12 +60,16 @@ class MemberController {
             })
         }
 
+        const partner = await Partner.find(request.all().partner_id)
+
         const data = {
             member:member.toJSON(),
             point:request.all().point,
             description: request.all().description,
-            partner_id: request.all().partner_id
+            partner_id: request.all().partner_id,
+            partner : partner.toJSON()
         }
+        
         Event.fire('sendpoint::member', data)
         return response.json({
             status: true,
