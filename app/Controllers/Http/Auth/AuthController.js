@@ -101,7 +101,7 @@ class AuthController {
 
 
     async request_token({request, response}) {
-        let token = Math.floor(Math.random() * 1000000);
+        let token = Math.floor(Math.random() * (999999 - 100000 + 1)) + 100000;
         
         token = token.toString()
         // return token
