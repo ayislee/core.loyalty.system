@@ -92,6 +92,7 @@ class VoucherController {
             
         }else{
             pid = await ThisLib.getPartnerIDFromUser(auth.user.user)
+            console.log('pid',pid)
             if(pid){
                 voucher.partner_id = pid
             }else{
