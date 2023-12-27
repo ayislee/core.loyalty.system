@@ -10,7 +10,7 @@ class PartnerID {
 	get messages(){
 		return {
             "phone.required" : "Phone is required",
-            "phone.msisdn" : "imvalid phone number"
+            "phone.msisdn" : "invalid phone number"
             
 
 		}
