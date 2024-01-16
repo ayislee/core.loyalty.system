@@ -49,10 +49,13 @@ Event.on('sendpoint::member', async (data) => {
         await trx.commit()
 
         const message = `SELAMAT! Anda mendapat ${data.point} point dari ${data.partner.name}, tukarkan point anda dengan voucher menarik di ${Env.get('APP_ROOT')}`
-        await WhatsappAPI.send({
-            phone: data.member.phone,
-            message: message
-        })
+        if(pH.point > 0){
+            await WhatsappAPI.send({
+                phone: data.member.phone,
+                message: message
+            })
+        }
+        
 
         
     } catch (error) {
