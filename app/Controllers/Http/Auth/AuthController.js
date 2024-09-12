@@ -7,6 +7,7 @@ const Member = use('App/Models/Member')
 const Event = use('Event')
 const Env = use('Env')
 const moment = use('moment')
+const MemberPartner = use('App/Models/MemberPartner')
 
 class AuthController {
 
@@ -102,10 +103,19 @@ class AuthController {
 
     async request_token({request, response}) {
         let token = Math.floor(Math.random() * (999999 - 100000 + 1)) + 100000;
+        // return response.json(request.all())
+
+        const m = Member.query()
+        if(request.all().lid_type == 'phone'){
+            m.where('phone',request.all().phone)
+        }else{
+            m.where('email',request.all().email)
+        }
         
+        const member = await m.first()
+
         token = token.toString()
         // return token
-        const member = await Member.query().where('phone',request.all().phone).first()
         if(!member){
             return response.json({
                 status: false,
@@ -115,7 +125,11 @@ class AuthController {
 
         member.token = token
         await member.save()
-        Event.fire('token::member', {member: member.toJSON(),token:token.toString()})
+        Event.fire('token::member', {
+            member: member.toJSON(),
+            lid_type: request.all().lid_type,
+            token:token.toString()
+        })
         return response.json({
             status: true,
             message: `Token already send valid in ${Env.get('TOKEN_VALIDITY_PERIODE')} minute(s)`
@@ -131,6 +145,9 @@ class AuthController {
                 const data = await Member.query()
                 .where('phone',request.all().phone)
                 .where('token_valid_until','>',now)
+                .with('member_partners',(build)=>{
+                    
+                })
                 .first()
 
                 if(!data){
@@ -140,11 +157,17 @@ class AuthController {
                     })        
                 }
 
+                const jdata = data.toJSON()
+                // return response.json(jdata)
+
                 const token = await auth.authenticator('token').generate(data)
                 return response.json({
                     status: true,
                     message: 'success',
-                    data: {...token,user:data}
+                    data: {...token,
+                        user:data,
+                        partner_id:jdata.default_partner_id !== null ? jdata.default_partner_id : jdata?.member_partners[0]?.partner_id
+                    }
                 })
             }
         } catch (error) {

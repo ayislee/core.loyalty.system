@@ -1,18 +1,16 @@
 'use strict'
 
-class PartnerID {
+class CartID {
     get rules () {
 		return {
-			phone: "msisdn",
+			cart_id: "required|exists:carts,cart_id",
 		}
 	}
 
 	get messages(){
 		return {
-            "phone.required" : "Phone is required",
-            "phone.msisdn" : "invalid phone number"
-            
-
+			"cart_id.required": "cart_id is required",
+            "cart_id.exists": "cart_id is not exists"
 		}
 	}
 
@@ -24,4 +22,4 @@ class PartnerID {
 	}
 }
 
-module.exports = PartnerID
+module.exports = CartID

@@ -13,6 +13,30 @@ Route.group(()=>{
     Route.get('/redeem/voucher','MemberController.redeem_voucher').validator('Pages')
     Route.get('/partner','PartnerController.all').validator('Pages')
     Route.get('/partner/detail','PartnerController.detail').validator('PartnerID')
+
+    Route.get('/store','ProductController.store').validator('PartnerID')
+    Route.get('/product','ProductController.list')
+    Route.get('/product/get','ProductController.get')
+    
+    Route.get('/cart','CartController.list').validator('Pages')
+    Route.get('/cart/get','CartController.get').validator('CartID')
+    Route.post('/cart','CartController.create')
+    Route.put('/cart','CartController.edit').validator('CartID')
+    Route.delete('/cart','CartController.delete').validator('CartID')
+    
+    Route.get('/transaction','TransactionController.list').validator('Pages')
+    Route.get('/transaction/get','TransactionController.get')
+    Route.post('/transaction','TransactionController.create')
+
+
+    // master
+    Route.get('/master/province','MasterController.province')
+    Route.get('/master/city','MasterController.city')
+    Route.get('/address','AddressController.list')
+    Route.get('/address/get','AddressController.get')
+    Route.post('/address','AddressController.create')
+    Route.put('/address','AddressController.edit')
+    
 }).prefix(prefix).middleware(['auth:token'])
 
 

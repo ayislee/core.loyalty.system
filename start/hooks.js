@@ -61,7 +61,7 @@ hooks.after.providersBooted(() => {
         // console.log('validator args',args)
 
         let value = get(data, field)
-        // console.log('validator value',value)
+        console.log('validator value',value)
         if (!value) {
             return
         }
@@ -71,6 +71,31 @@ hooks.after.providersBooted(() => {
         }
     }
     Validator.extend('msisdn', msisdnFn)
+
+    const phoneOrEmailFn = async(data, field, message, args, get) =>{
+        // console.log('validator data',data)
+        // console.log('validator field',field)
+        // console.log('validator args',args)
+
+        let value = get(data, field)
+        console.log('validator value',value)
+        if (!value) {
+            return
+        }
+
+        // is Email ?
+        if(!value.match(/^[\w-\.]+@([\w-]+\.)+[\w-]{2,4}/)){
+            if(!value.match(/^(\+62|62)?[\s-]?0?8[1-9]{1}\d{1}[\s-]?\d{4}[\s-]?\d{2,5}$/)){
+                throw message
+            }
+        }
+
+
+        // if(!value.match(/^(\+62|62)?[\s-]?0?8[1-9]{1}\d{1}[\s-]?\d{4}[\s-]?\d{2,5}$/)){
+        //     throw message
+        // }
+    }
+    Validator.extend('phoneOrEmail', phoneOrEmailFn)
 
 
 })
