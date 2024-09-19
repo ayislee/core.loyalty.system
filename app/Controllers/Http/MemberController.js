@@ -55,7 +55,8 @@ class MemberController {
                 member.phone = request.all().phone
                 member.email = request.all().email
                 member.status = 'not active'
-                await member.save(trx)
+                await member.save()
+                // await member.save(trx)
                 memberPartner = new MemberPartner()
                 memberPartner.member_id = member.member_id
                 memberPartner.partner_id = request.all().partner_id
