@@ -5,11 +5,19 @@ const axios = use('axios')
 
 class AddressController {
     async list({request, response, auth}) {
-        const address = await Address.query().where('member_id',auth.user.member_id).fetch()
-        return response.json({
-            status: false,
-            data: address
-        })
+        try {
+            const address = await Address.query().where('member_id',auth.user.member_id).fetch()
+            return response.json({
+                status: true,
+                data: address
+            })    
+        } catch (error) {
+            return response.json({
+                status: false,
+                data: error.message
+            })
+        }
+        
     }
 
     async create({request, response, auth}) {
