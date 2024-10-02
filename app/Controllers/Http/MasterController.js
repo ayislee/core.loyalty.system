@@ -49,6 +49,54 @@ class MasterController {
             })
         }
     }
+
+    async payment({request, response}) {
+        const req = request.all()
+        try {
+            const res = await axios.get(Env.get('MARKETPLACE_CORE')+`list/ms_payment`)
+            // console.log(res.data)
+            if(res.data.success){
+                return response.json({
+                    status: true,   
+                    data: res.data.data
+                })
+            }else{
+                return response.json({
+                    status: false,
+                    message: res.data.error
+                })
+            }
+        } catch (error) {
+            return response.json({
+                status: false,
+                message: error.message
+            })
+        }
+    }
+
+    async delivery({request, response}) {
+        const req = request.all()
+        try {
+            const res = await axios.get(Env.get('MARKETPLACE_CORE')+`list/ms_delivery`)
+            // console.log(res.data)
+            if(res.data.success){
+                return response.json({
+                    status: true,   
+                    data: res.data.data
+                })
+            }else{
+                return response.json({
+                    status: false,
+                    message: res.data.error
+                })
+            }
+        } catch (error) {
+            return response.json({
+                status: false,
+                message: error.message
+            })
+        }
+    }
 }
 
 module.exports = MasterController

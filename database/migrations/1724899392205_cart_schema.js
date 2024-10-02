@@ -15,6 +15,7 @@ class CartSchema extends Schema {
             table.string('item_image')
             table.string('menu_slug')
             table.enum('checked',['0','1']).defaultTo('0')
+            table.integer('partner_id').unsigned()
             table.timestamps()
         })
     }

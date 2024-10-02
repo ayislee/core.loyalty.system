@@ -16,6 +16,14 @@ const Partner = use('App/Models/Partner')
 const MemberPartner = use('App/Models/MemberPartner')
 
 class MemberController {
+
+    async auth({request, response, auth}) {
+        
+        return response.json({
+            status: true,
+            data: auth.user
+        })
+    }
     async register({request, response, auth}) {
         // return response.json(request.all())
         let member, memberPartner
@@ -38,6 +46,8 @@ class MemberController {
                 //     registered: true,
                 //     message: "member already registered"
                 // })
+                member.default_partner_id = request.all().partner_id
+                await member.save()
                 memberPartner = await MemberPartner.query()
                 .where('member_id',member.member_id)
                 .where('partner_id',request.all().partner_id)
@@ -54,6 +64,7 @@ class MemberController {
                 member = new Member()
                 member.phone = request.all().phone
                 member.email = request.all().email
+                member.default_partner_id = request.all().partner_id
                 member.status = 'not active'
                 await member.save(trx)
                 memberPartner = new MemberPartner()
@@ -156,12 +167,16 @@ class MemberController {
     async getvoucher({request, response}) {
         // return request.all()
         // Decrypt
+        const now = moment().format('YYYY-MM-DD HH:mm:ss')
         try {
             var bytes  = CryptoJS.AES.decrypt(request.all().code, request.all().sid);
             // console.log(bytes)
             var originalText = bytes.toString(CryptoJS.enc.Utf8);
+            console.log(originalText)
             if(originalText === '') throw "500"
-            const mv = await MemberVoucher.query().where('member_voucher_id',originalText).where('used','0')
+            const mv = await MemberVoucher.query()
+            .where('member_voucher_id',originalText).where('used','0')
+            .where('expire_date','>=',now)
             .with('voucher')
             .with('member')
             .first()

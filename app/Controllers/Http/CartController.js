@@ -8,6 +8,7 @@ class CartController {
         const req = request.all()
         const cart = await Cart.query()
         .where('member_id',auth.user.member_id)
+        .filter(req.filter)
         .orderBy('cart_id','desc')
         .paginate(req.page, req.rows)
         const djson = cart.toJSON()

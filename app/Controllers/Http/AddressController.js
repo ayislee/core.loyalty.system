@@ -85,9 +85,24 @@ class AddressController {
                 message: error.message
             })            
         }
+    }
 
-
-
+    async delete({request, response, auth}) {
+        const req = request.all()
+        try {
+            const address = await Address.query().where('address_id',req.address_id).first()
+            await address.delete()
+            return response.json({
+                status: true,
+                message: 'success'
+            })      
+        } catch (error) {
+            return response.json({
+                status: false,
+                message: error.message
+            })  
+        }
+        
     }
 }
 
