@@ -8,7 +8,7 @@ const Event = use('Event')
 const Env = use('Env')
 const moment = use('moment')
 const MemberPartner = use('App/Models/MemberPartner')
-
+const Partner = use('App/Models/Partner')
 class AuthController {
 
 
@@ -157,6 +157,8 @@ class AuthController {
                     })        
                 }
 
+                const partner = await Partner.query().where('partner_id',data.default_partner_id).first()
+
                 const jdata = data.toJSON()
                 // return response.json(jdata)
 
@@ -166,7 +168,11 @@ class AuthController {
                     message: 'success',
                     data: {...token,
                         user:data,
-                        partner_id:jdata.default_partner_id !== null ? jdata.default_partner_id : jdata?.member_partners[0]?.partner_id
+                        partner_id:jdata.default_partner_id !== null ? jdata.default_partner_id : jdata?.member_partners[0]?.partner_id,
+                        partner: {
+                            primary_color: partner.primary_color,
+                            primary_color_hover: partner.primary_color_hover
+                        }
                     }
                 })
             }

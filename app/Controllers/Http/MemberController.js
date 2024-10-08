@@ -12,13 +12,18 @@ const Database = use('Database')
 const Event = use('Event')
 const moment = use('moment')
 const CryptoJS = require("crypto-js");
+const { parseEnv } = require("util")
 const Partner = use('App/Models/Partner')
 const MemberPartner = use('App/Models/MemberPartner')
 
 class MemberController {
 
     async auth({request, response, auth}) {
-        
+        const partner = await Partner.query().where('partner_id', auth.user.default_partner_id).first()
+        auth.user.partner = {
+            primary_color: partner.primary_color,
+            primary_color_hover: partner.primary_color_hover
+        }
         return response.json({
             status: true,
             data: auth.user

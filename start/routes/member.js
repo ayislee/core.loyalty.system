@@ -29,6 +29,7 @@ Route.group(()=>{
     Route.get('/transaction','TransactionController.list').validator('Pages')
     Route.get('/transaction/get','TransactionController.get')
     Route.post('/transaction','TransactionController.create')
+    Route.put('/transaction/resume','TransactionController.resume')
 
 
     // master
