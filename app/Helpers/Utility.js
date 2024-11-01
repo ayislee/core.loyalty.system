@@ -10,7 +10,7 @@ dayjs.extend(localizedFormat); //plugin untuk display local format seperti "LLL"
 dayjs.extend(isBetween); //plugin untuk cek date ada di range tertentu
 
 //sanitizing HTML function
-const SanitizeHTML = require("./SanitizeHTML");
+// const SanitizeHTML = require("./SanitizeHTML");
 
 //native function
 const util = require("util");

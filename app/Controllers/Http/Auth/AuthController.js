@@ -1,14 +1,14 @@
 'use strict'
 const User = use('App/Models/User')
 const Utility = use("Utility");
-// const PointLib = use('App/Lib/PointLib')
-// const uuid = use('uuid')
-// const Member = use('App/Models/Member')
-// const Event = use('Event')
-// const Env = use('Env')
-// const moment = use('moment')
-// const MemberPartner = use('App/Models/MemberPartner')
-// const Partner = use('App/Models/Partner')
+const PointLib = use('App/Lib/PointLib')
+const uuid = use('uuid')
+const Member = use('App/Models/Member')
+const Event = use('Event')
+const Env = use('Env')
+const moment = use('moment')
+const MemberPartner = use('App/Models/MemberPartner')
+const Partner = use('App/Models/Partner')
 class AuthController {
 
 
