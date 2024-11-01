@@ -14,6 +14,7 @@ class AuthController {
 
 	async user_register({request, response}) {
         try {
+            console.log("register")
             const user = new User()
             user.firstname = request.all()?.firstname
             user.lastname = request.all()?.lastname
