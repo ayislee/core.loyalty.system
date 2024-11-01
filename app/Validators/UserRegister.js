@@ -5,9 +5,9 @@ class UserRegister {
 		return {
 			firstname: "string|required",
             lastname: "string|required",
-            phone: "msisdn|required",
-			email: "email|required|unique:users,email",
-			password: "string|required",
+            // phone: "msisdn|required",
+			// email: "email|required|unique:users,email",
+			// password: "string|required",
 			type:"in:partner,admin"
 		}
 	}
