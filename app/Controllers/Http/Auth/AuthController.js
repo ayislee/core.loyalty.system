@@ -13,6 +13,7 @@ class AuthController {
 
 
 	async user_register({request, response}) {
+        return "Helo"
         // try {
         //     console.log("register")
         //     const user = new User()

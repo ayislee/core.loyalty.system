@@ -21,3 +21,4 @@ if(Env.get('NODE_ENV')==='development'){
 Route.get('/',()=>{
     return "welcome to Core Loyalty System"
 })
+
