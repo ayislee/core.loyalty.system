@@ -7,8 +7,7 @@ const Env = use('Env')
 const prefix='/api/v1/user/auth'
 
 Route.group(()=>{
-    Route.get('/register','Auth/AuthController.user_register')
-    .validator('UserRegister')
+    Route.post('/register','Auth/AuthController.user_register').validator('UserRegister')
     Route.post('/login','Auth/AuthController.user_login').validator('UserLogin')
 }).prefix(prefix)
 

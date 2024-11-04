@@ -13,30 +13,29 @@ class AuthController {
 
 
 	async user_register({request, response}) {
-        return "Helo"
-        // try {
-        //     console.log("register")
-        //     const user = new User()
-        //     user.firstname = request.all()?.firstname
-        //     user.lastname = request.all()?.lastname
-        //     user.email = request.all().email
-        //     user.password = request.all().password  
-        //     user.type = request.all().type
-        //     user.phone = request.all().phone
-        //     user.status = 'active'
-        //     await user.save()
-        //     return response.json({
-        //         status: true,
-        //         message: 'User created'
-        //     })
+        try {
+            // console.log("register")
+            const user = new User()
+            user.firstname = request.all()?.firstname
+            user.lastname = request.all()?.lastname
+            user.email = request.all().email
+            user.password = request.all().password  
+            user.type = request.all().type
+            user.phone = request.all().phone
+            user.status = 'active'
+            await user.save()
+            return response.json({
+                status: true,
+                message: 'User created'
+            })
 
-        // } catch (error) {
-        //     console.log(error)
-        //     return response.json({
-        //         status: false,
-        //         message: 'Something wrong'
-        //     })
-        // }
+        } catch (error) {
+            console.log(error)
+            return response.json({
+                status: false,
+                message: 'Something wrong'
+            })
+        }
 	}
 
     async user_login({request, response, auth}){
