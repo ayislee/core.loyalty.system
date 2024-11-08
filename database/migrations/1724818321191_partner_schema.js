@@ -7,7 +7,8 @@ class PartnerSchema extends Schema {
     up() {
         this.table('partners', (table) => {
             // alter table
-            table.json('store_slug')
+            table.string('store_slug')
+            table.string('company_slug')
         })
     }
 
