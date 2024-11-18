@@ -103,6 +103,7 @@ class AuthController {
 
 
     async request_token({request, response}) {
+        // return request.all()
         let token = Math.floor(Math.random() * (999999 - 100000 + 1)) + 100000;
         // return response.json(request.all())
 
@@ -114,7 +115,7 @@ class AuthController {
         }
         
         const member = await m.first()
-
+        // return member
         token = token.toString()
         // return token
         if(!member){
@@ -138,9 +139,12 @@ class AuthController {
     }
 
     async login_token({request, response, auth}) {
+        // return request.all()
+
 
         try {
-            if(await auth.authenticator('token').attempt(request.all().phone, request.all().token)){
+            if(await auth.authenticator('token').attempt(request.all().lid, request.all().token)){
+                console.log("test")
                 const now = moment().format('YYYY-MM-DD HH:mm:ss')
                 
                 const data = await Member.query()
