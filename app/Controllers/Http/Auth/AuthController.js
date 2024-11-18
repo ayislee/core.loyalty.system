@@ -178,6 +178,7 @@ class AuthController {
                 })
             }
         } catch (error) {
+            console.log('terjadi error')
             console.log(error)
             return response.json({
                 status: false,
