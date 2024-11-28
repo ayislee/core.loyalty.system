@@ -5,6 +5,7 @@ class AuthMerchant {
 
     async handle({ request, response }, next) {
         // call next to advance the request
+        // return response.json(request.all())
         if(!request.all().sid){
             return response.json({
                 status: false,
@@ -20,16 +21,15 @@ class AuthMerchant {
         }
         
         const partner = await Partner.query().where('server_id', request.all().sid).where('client_id',request.all().cid).first()
+        // return response.json(partner)
         if(!partner) {
             return response.json({
                 status: false,
                 message: 'invalid partner'
             })
         }
-
+        
         request.all().partner_id = partner.partner_id
-
-
         await next()
     }
 }

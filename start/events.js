@@ -12,6 +12,8 @@ const uuid = use('uuid')
 const moment = use('moment')
 const Env = use('Env')
 const WhatsappAPI = use('App/Lib/WhatsappAPI')
+const Email = use('App/Lib/Email')
+
 
 Event.on('new::member', async (member) => {
     console.log('New member action',member)
@@ -69,19 +71,27 @@ Event.on('token::member', async (data) => {
     // console.log(data)
     const message = `SANGAT RAHASIA! Jangan di informasikan ke pihak lain, token akses anda adalah : ${data.token}`
     data.message = message
-    await WhatsappAPI.send({
-        phone: data.member.phone,
-        message: message
-    })
+    if(data.lid_type === 'phone'){
+        await WhatsappAPI.send({
+            phone: data.member.phone,
+            message: message
+        })
+    }else{
+        // sent token via email
+        console.log(data)
+        await Email.send({
+            email: data.member.email,
+            subject: 'SANGAT RAHASIA!',
+            message: message,
+        })
+    }
     
 })
 
 Event.on('redeem::member', async (data) => {
-    console.log(data)
+    // console.log('point',data)
     const trx = await Database.beginTransaction()
     try {
-
-        
         const pH = new PointHistory()
         pH.member_id = data.point.member_id
         pH.ref_id = uuid.v4()
@@ -94,7 +104,7 @@ Event.on('redeem::member', async (data) => {
         mVoucher.voucher_id = data.voucher.voucher_id
         mVoucher.voucher_code = uuid.v4()
         mVoucher.expire_date = moment().add(data.voucher.duration,'days').format('YYYY-MM-DD HH:mm:ss')
-        mVoucher.amount = parseFloat(Env.get('POINT')) * data.voucher.number_point
+        mVoucher.amount = parseFloat(Env.get('POINT')?Env.get('POINT'):1000) * data.voucher.number_point
         await mVoucher.save(trx)
         await trx.commit()
         console.log('success')

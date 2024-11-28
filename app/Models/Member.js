@@ -65,6 +65,10 @@ class Member extends Model {
     member_voucher() {
         return this.hasMany('App/Models/MemberVoucher','member_id','member_id')
     }
+
+    member_partners() {
+        return this.hasMany('App/Models/MemberPartner','member_id','member_id')
+    }
 }
 
 module.exports = Member

@@ -6,5 +6,5 @@ const Env = use('Env')
 
 const prefix='/api/v1/test'
 Route.group(()=>{
-    Route.get('/','Test/TestController.test').middleware('auth')
+    Route.get('/','Test/TestController.test')
 }).prefix(prefix)

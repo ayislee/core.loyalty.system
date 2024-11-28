@@ -1,18 +1,15 @@
 'use strict'
 
-class PartnerID {
+class Email {
     get rules () {
 		return {
-			phone: "msisdn",
+			email: "email",
 		}
 	}
 
 	get messages(){
 		return {
-            "phone.required" : "Phone is required",
-            "phone.msisdn" : "invalid phone number"
-            
-
+            "email.email" : "invalid email",
 		}
 	}
 
@@ -24,4 +21,4 @@ class PartnerID {
 	}
 }
 
-module.exports = PartnerID
+module.exports = Email

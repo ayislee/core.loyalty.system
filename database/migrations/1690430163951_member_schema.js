@@ -8,7 +8,7 @@ class MemberSchema extends Schema {
         this.create('members', (table) => {
             table.increments('member_id')
             table.string('lid')
-            table.string('phone', 25).notNullable().unique()
+            table.string('phone', 25).unique()
             table.string('email', 254).unique()
             table.enu('verified_email',['0','1']).defaultTo('0')
             table.string('password', 60)

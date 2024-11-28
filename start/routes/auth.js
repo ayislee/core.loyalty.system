@@ -13,9 +13,9 @@ Route.group(()=>{
 
 const prefix2='/api/v1/member/auth'
 Route.group(()=>{
-    Route.post('/request/token','Auth/AuthController.request_token').validator('Phone')
+    Route.post('/request/token','Auth/AuthController.request_token').validator('lid').middleware(['PhoneOrEmail'])
     .middleware(['ConvertPhone'])
-    Route.post('/login/token','Auth/AuthController.login_token').validator('Phone').validator('Token')
+    Route.post('/login/token','Auth/AuthController.login_token').validator('lid').validator('Token').middleware(['PhoneOrEmail'])
     .middleware(['ConvertPhone'])
 }).prefix(prefix2)
 

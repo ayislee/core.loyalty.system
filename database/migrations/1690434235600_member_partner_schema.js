@@ -7,7 +7,7 @@ class MemberPartnerSchema extends Schema {
     up() {
         this.create('member_partners', (table) => {
             table.increments('member_partner_id')
-            table.integer('member_id').unsigned().notNullable().references('user_id').inTable('users')
+            table.integer('member_id').unsigned().notNullable().references('member_id').inTable('members')
             table.integer('partner_id').unsigned().notNullable().references('partner_id').inTable('partners')
             table.timestamps()
             table.datetime('deleted_at')

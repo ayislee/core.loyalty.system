@@ -4,7 +4,7 @@ class Voucher {
     get rules () {
 		return {
 			name: "required",
-			sku: "required",
+			// sku: "required",
             product_image: "required",
 			voucher_image: "required",
             status: "required|in:active,not active",

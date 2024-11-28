@@ -12,47 +12,120 @@ const Database = use('Database')
 const Event = use('Event')
 const moment = use('moment')
 const CryptoJS = require("crypto-js");
+const { parseEnv } = require("util")
 const Partner = use('App/Models/Partner')
+const MemberPartner = use('App/Models/MemberPartner')
 
 class MemberController {
-    async register({request, response}) {
-        let member 
-        member = await Member.query().where('phone',request.all().phone).first()
-        if(member){
-            return response.json({
-                status: true,
-                registered: true,
-                message: "member already registered"
-            })
+
+    async auth({request, response, auth}) {
+        const partner = await Partner.query().where('partner_id', auth.user.default_partner_id).first()
+        auth.user.partner = {
+            primary_color: partner.primary_color,
+            primary_color_hover: partner.primary_color_hover
+        }
+        return response.json({
+            status: true,
+            data: auth.user
+        })
+    }
+    async register({request, response, auth}) {
+        // return response.json(request.all())
+        let member, memberPartner
+
+        
+        // const trx = await Database.beginTransaction()
+        const m = Member.query()
+        if(request.all().lid_type == 'phone'){
+            m.where('phone',request.all().phone)
         }else{
-            try {
+            m.where('email',request.all().email)
+        }
+        
+        member = await m.first()
+        // return response.json(member)
+        try {
+            if(member){
+                // return response.json({
+                //     status: true,
+                //     registered: true,
+                //     message: "member already registered"
+                // })
+                member.default_partner_id = request.all().partner_id
+                await member.save()
+                memberPartner = await MemberPartner.query()
+                .where('member_id',member.member_id)
+                .where('partner_id',request.all().partner_id)
+                .first()
+                if(!memberPartner){
+                    memberPartner = new MemberPartner()
+                    memberPartner.member_id = member.member_id
+                    memberPartner.partner_id = request.all().partner_id
+                    await memberPartner.save()
+                    // await trx.commit()
+                }
+
+            }else{
                 member = new Member()
                 member.phone = request.all().phone
+                member.email = request.all().email
+                member.default_partner_id = request.all().partner_id
                 member.status = 'not active'
                 await member.save()
-
+                // await member.save(trx)
+                memberPartner = new MemberPartner()
+                memberPartner.member_id = member.member_id
+                memberPartner.partner_id = request.all().partner_id
+                await memberPartner.save()
+                // await trx.commit()
                 // kirim pesan melalui whatsapp
                 Event.fire('new::member', member.toJSON())
 
-                return response.json({
-                    status : true,
-                    registered: true,
-                    message: 'success'
-
-                })                
-            } catch (error) {
-                return response.json({
-                    status: false,
-                    message : 'something wrong'
-                })
             }
+
+            // auth ... token
+
+            member = await Member.query()
+            .where('member_id',member.member_id)
+            .with('member_partners')
+            .first()
             
+            const partner = await Partner.query().select('partner_id','name','logo','desc','howtogetpoint','company_slug')
+            .where('partner_id',request.all().partner_id)
+            .first()
+            const token = await auth.authenticator('token').generate(member)
+
+            return response.json({
+                status: true,
+                message: 'success',
+                data: {...token,user:member,partner:request.all().partner_id}
+            })
+
+            
+
+        } catch (error) {
+            console.log(error.message)
+            // await trx.rollback()
+            return response.json({
+                status: false,
+                message : 'something wrong'
+            })
         }
+            
+        
     }
 
     async sendpoint({request, response}) {
         // return response.json(request.all())
-        const member = await Member.query().where('phone',request.all().phone).first()
+        const m = Member.query()
+        if(request.all().lid_type == 'phone'){
+            m.where('phone',request.all().phone)
+        }else{
+            m.where('email',request.all().email)
+        }
+        
+        const member = await m.first()
+
         if(!member){
             return response.json({
                 status: false,
@@ -78,7 +151,10 @@ class MemberController {
     }
 
     async getpoint({request, response}) {
-        const member = await Member.query().where('phone',request.all().phone).with('point').first()
+        // return response.json(request.all())
+        const m = Member.query()
+        
+        where('phone',request.all().phone).with('point').first()
         if(!member){
             return response.json({
                 status: false,
@@ -97,12 +173,16 @@ class MemberController {
     async getvoucher({request, response}) {
         // return request.all()
         // Decrypt
+        const now = moment().format('YYYY-MM-DD HH:mm:ss')
         try {
             var bytes  = CryptoJS.AES.decrypt(request.all().code, request.all().sid);
             // console.log(bytes)
             var originalText = bytes.toString(CryptoJS.enc.Utf8);
+            console.log(originalText)
             if(originalText === '') throw "500"
-            const mv = await MemberVoucher.query().where('member_voucher_id',originalText).where('used','0')
+            const mv = await MemberVoucher.query()
+            .where('member_voucher_id',originalText).where('used','0')
+            .where('expire_date','>=',now)
             .with('voucher')
             .with('member')
             .first()
@@ -345,6 +425,34 @@ class MemberController {
             status: true,
             data: data
         })
+    }
+
+    async request_auth({request, response, auth}) {
+        // return response.json(request.all())
+        const partner = await Partner.query()
+        .where('partner_id', request.all().partner_id)
+        .first()
+        
+        const member = await Member.query().select(
+            'members.member_id',
+            'phone',
+            'email',
+            'firstname',
+            'lastname',
+            'image_profile'
+        )
+        .innerJoin('member_partners','member_partners.member_id','members.member_id')
+        .where('email', request.all().email)
+        .first()
+
+        const token = await auth.authenticator('token').generate(member)
+
+        return response.json({
+            status: true,
+            data: token,
+            member: member
+        })
+
     }
 }
 

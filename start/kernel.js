@@ -53,6 +53,7 @@ const namedMiddleware = {
   FilterPartner: 'App/Middleware/FilterPartner',
   AuthMerchant :'App/Middleware/AuthMerchant',
   ConvertPhone: 'App/Middleware/ConvertPhone',
+  PhoneOrEmail: 'App/Middleware/PhoneOrEmail',
 }
 
 /*
