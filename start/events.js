@@ -11,7 +11,7 @@ const Database = use('Database')
 const uuid = use('uuid')
 const moment = use('moment')
 const Env = use('Env')
-const WhatsappAPI = use('App/Lib/WhatsappAPI')
+const SMSAPI = use('App/Lib/SMSAPI')
 const Email = use('App/Lib/Email')
 
 
@@ -69,10 +69,10 @@ Event.on('sendpoint::member', async (data) => {
 
 Event.on('token::member', async (data) => {
     // console.log(data)
-    const message = `SANGAT RAHASIA! Jangan di informasikan ke pihak lain, token akses anda adalah : ${data.token}`
+    const message = `SANGAT RAHASIA! Jangan di informasikan ke pihak lain, token akses anda adalah ${data.token}, berlaku 5 menit`
     data.message = message
     if(data.lid_type === 'phone'){
-        await WhatsappAPI.send({
+        await SMSAPI.send({
             phone: data.member.phone,
             message: message
         })

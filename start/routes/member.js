@@ -50,7 +50,7 @@ Route.group(()=>{
     
     Route.get('/auth','MemberController.auth')
     
-}).prefix(prefix).middleware(['auth:token'])
+}).prefix(prefix).middleware(['auth:phone','auth:email'])
 
 
 const prefix2='/api/v1/admin/member'

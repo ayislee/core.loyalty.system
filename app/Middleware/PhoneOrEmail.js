@@ -12,6 +12,7 @@ class ConvertPhone {
             request.all().phone = request.all().lid
             request.all().email = null
             request.all().lid_type = 'phone'
+            
         }else{
             request.all().email = request.all().lid
             request.all().phone = null
@@ -24,6 +25,7 @@ class ConvertPhone {
             }else if(request.all().phone[0] === '+'){
                 request.all().phone = request.all().phone.replace("+", "");
             }
+            request.all().lid = request.all().phone
         }
         
         

@@ -140,25 +140,25 @@ class AuthController {
 
     async login_token({request, response, auth}) {
         // return request.all()
-
-
         try {
-            if(await auth.authenticator('token').attempt(request.all().lid, request.all().token)){
+            console.log('phone',request.all().phone)
+            await auth.authenticator(request.all().lid_type).attempt(request.all().lid, request.all().token)
+
+            if(await auth.authenticator(request.all().lid_type).attempt(request.all().lid, request.all().token)){
                 console.log("test")
                 const now = moment().format('YYYY-MM-DD HH:mm:ss')
                 
                 const data = await Member.query()
-                .where('phone',request.all().phone)
+                .where(request.all().lid_type,request.all().lid)
                 .where('token_valid_until','>',now)
                 .with('member_partners',(build)=>{
-                    
                 })
                 .first()
 
                 if(!data){
                     return response.json({
                         status: false,
-                        message: 'invalid member'
+                        message: 'token expired'
                     })        
                 }
 
@@ -167,7 +167,7 @@ class AuthController {
                 const jdata = data.toJSON()
                 // return response.json(jdata)
 
-                const token = await auth.authenticator('token').generate(data)
+                const token = await auth.authenticator(request.all().lid_type).generate(data)
                 return response.json({
                     status: true,
                     message: 'success',
@@ -182,8 +182,8 @@ class AuthController {
                 })
             }
         } catch (error) {
-            console.log('terjadi error')
-            console.log(error)
+            // console.log('terjadi error')
+            // console.log(error)
             return response.json({
                 status: false,
                 message: 'invalid token'

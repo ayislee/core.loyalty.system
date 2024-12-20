@@ -85,5 +85,5 @@ Server
 |
 */
 
-const Scheduler = use('Adonis/Addons/Scheduler')
-Scheduler.run()
+// const Scheduler = use('Adonis/Addons/Scheduler')
+// Scheduler.run()

@@ -92,11 +92,21 @@ module.exports = {
     password: 'password'
   },
 
-  token: {
+  email: {
     serializer: 'lucid',
     model: 'App/Models/Member',
     scheme: 'jwt',
     uid: 'email',
+    password: 'token',
+    options: {
+      secret: Env.get('APP_KEY')
+    }
+  },
+  phone: {
+    serializer: 'lucid',
+    model: 'App/Models/Member',
+    scheme: 'jwt',
+    uid: 'phone',
     password: 'token',
     options: {
       secret: Env.get('APP_KEY')
