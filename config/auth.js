@@ -92,6 +92,16 @@ module.exports = {
     password: 'password'
   },
 
+  token: {
+    serializer: 'lucid',
+    model: 'App/Models/Member',
+    scheme: 'jwt',
+    uid: 'lid',
+    password: 'token',
+    options: {
+      secret: Env.get('APP_KEY')
+    }
+  },
   email: {
     serializer: 'lucid',
     model: 'App/Models/Member',
@@ -133,14 +143,5 @@ module.exports = {
       secret: Env.get('APP_KEY')
     }
   },
-  easygo_user: {
-    serializer: 'lucid',
-    model: 'App/Models/EgUser',
-    scheme: 'jwt',
-    uid: 'user_email',
-    password: 'user_pass',
-    options: {
-      secret: Env.get('APP_KEY')
-    }
-  }
+  
 }

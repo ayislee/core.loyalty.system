@@ -52,10 +52,10 @@ Event.on('sendpoint::member', async (data) => {
 
         const message = `SELAMAT! Anda mendapat ${data.point} point dari ${data.partner.name}, tukarkan point anda dengan voucher menarik di ${Env.get('APP_ROOT')}`
         if(pH.point > 0){
-            await WhatsappAPI.send({
-                phone: data.member.phone,
-                message: message
-            })
+            // await WhatsappAPI.send({
+            //     phone: data.member.phone,
+            //     message: message
+            // })
         }
         
 

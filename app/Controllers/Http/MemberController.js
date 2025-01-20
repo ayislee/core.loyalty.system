@@ -52,6 +52,7 @@ class MemberController {
                 //     message: "member already registered"
                 // })
                 member.default_partner_id = request.all().partner_id
+                member.lid = request.all().lid_type == 'phone' ? request.all().phone : request.all().email
                 await member.save()
                 memberPartner = await MemberPartner.query()
                 .where('member_id',member.member_id)
@@ -70,6 +71,7 @@ class MemberController {
                 member.phone = request.all().phone
                 member.email = request.all().email
                 member.default_partner_id = request.all().partner_id
+                member.lid = request.all().lid_type == 'phone' ? request.all().phone : request.all().email
                 member.status = 'not active'
                 await member.save()
                 // await member.save(trx)
