@@ -68,7 +68,7 @@ Event.on('sendpoint::member', async (data) => {
 
 
 Event.on('token::member', async (data) => {
-    // console.log(data)
+    console.log(data)
     const message = `SANGAT RAHASIA! Jangan di informasikan ke pihak lain, token akses anda adalah ${data.token}, berlaku 5 menit`
     console.log(message)
     data.message = message
