@@ -3,7 +3,7 @@
 class lid {
     get rules () {
 		return {
-			lid: "required|phoneOrEmail",
+			lid: "phoneOrEmail",
 		}
 	}
 
