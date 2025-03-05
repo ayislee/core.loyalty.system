@@ -66,6 +66,7 @@ const aliases = {
 |
 */
 const commands = [
+  'App/Commands/Calculatepoint',
 ]
 
 module.exports = { providers, aceProviders, aliases, commands }
