@@ -12,6 +12,7 @@ const uuid = use('uuid')
 const moment = use('moment')
 const Env = use('Env')
 const SMSAPI = use('App/Lib/SMSAPI')
+const WhatsappAPI = use('App/Lib/WhatsappAPI')
 const Email = use('App/Lib/Email')
 
 
@@ -52,10 +53,27 @@ Event.on('sendpoint::member', async (data) => {
 
         const message = `SELAMAT! Anda mendapat ${data.point} point dari ${data.partner.name}, tukarkan point anda dengan voucher menarik di ${Env.get('APP_ROOT')}`
         if(pH.point > 0){
-            // await WhatsappAPI.send({
-            //     phone: data.member.phone,
-            //     message: message
-            // })
+            switch (Env.get('TOKEN_SERVICE')) {
+                case 'WHATSAPP':
+                    // code
+                    await WhatsappAPI.send({ 
+                        phone: data.member.phone,
+                        message: message
+                    })
+                    break;
+                
+                case 'SMS':
+                    // code
+                    await SMSAPI.send({
+                        phone: data.member.phone,
+                        message: message
+                    })
+                    break;
+                default:
+                    // Default
+                    break;
+            }
+            
         }
         
 
@@ -73,10 +91,27 @@ Event.on('token::member', async (data) => {
     console.log(message)
     data.message = message
     if(data.lid_type === 'phone'){
-        await SMSAPI.send({
-            phone: data.member.phone,
-            message: message
-        })
+        switch (Env.get('TOKEN_SERVICE')) {
+            case 'WHATSAPP':
+                // code
+                await WhatsappAPI.send({ 
+                    phone: data.member.phone,
+                    message: message
+                })
+                break;
+            
+            case 'SMS':
+                // code
+                await SMSAPI.send({
+                    phone: data.member.phone,
+                    message: message
+                })
+                break;
+            default:
+                // Default
+                break;
+        }
+       
     }else{
         // sent token via email
         console.log(data)
