@@ -139,7 +139,6 @@ class AuthController {
     }
 
     async login_token({request, response, auth}) {
-        // return request.all()
         try {
             console.log('phone',request.all().phone)
             await auth.authenticator(request.all().lid_type).attempt(request.all().lid, request.all().token)
@@ -162,10 +161,13 @@ class AuthController {
                     })        
                 }
 
+                // Update member status to active
+                data.status = 'active'
+                await data.save()
+
                 const partner = await Partner.query().where('partner_id',data.default_partner_id).first()
 
                 const jdata = data.toJSON()
-                // return response.json(jdata)
 
                 const token = await auth.authenticator(request.all().lid_type).generate(data)
                 return response.json({
@@ -182,14 +184,11 @@ class AuthController {
                 })
             }
         } catch (error) {
-            // console.log('terjadi error')
-            // console.log(error)
             return response.json({
                 status: false,
                 message: 'invalid token'
             })
         }
-        
     }
 
 
