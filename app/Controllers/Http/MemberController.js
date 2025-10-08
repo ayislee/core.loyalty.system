@@ -401,17 +401,26 @@ class MemberController {
     }
 
     async member_points({request, response, auth}) {
+        // Get point total for member
+        const point = await Point.query()
+            .where('member_id', request.all().member_id)
+            .first()
+
+        // Get point history with pagination
         const data = await PointHistory.query()
-        .where('member_id',request.all().member_id)
-        .with('member')
-        .filter(request.all().filter)
-        .order(request.all().order)
-        .orderBy('point_history_id','desc')
-        .paginate(request.all().page, request.all().rows)
+            .where('member_id',request.all().member_id)
+            .with('member')
+            .filter(request.all().filter)
+            .order(request.all().order)
+            .orderBy('point_history_id','desc')
+            .paginate(request.all().page, request.all().rows)
 
         return response.json({
             status: true,
-            data: data
+            data: {
+                ...data.toJSON(),
+                total_point: point ? point.point : 0
+            }
         })
     }
 

@@ -60,3 +60,12 @@ Route.group(()=>{
     Route.get('/points','MemberController.member_points').validator('MemberID').validator('Pages')
     Route.get('/vouchers','MemberController.member_vouchers').validator('MemberID').validator('Pages')
 }).prefix(prefix2).middleware(['auth:jwt'])
+
+const prefix_dashboard = '/api/v1/admin/dashboard'
+Route.group(() => {
+    Route.get('/stats', 'DashboardController.stats')
+    Route.get('/recent-members', 'DashboardController.recentMembers')
+    Route.get('/point-history', 'DashboardController.pointHistory')
+    Route.get('/voucher-usage', 'DashboardController.voucherUsage')
+    Route.get('/transactions', 'DashboardController.transactions')
+}).prefix(prefix_dashboard).middleware(['auth:jwt'])
