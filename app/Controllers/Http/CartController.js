@@ -15,7 +15,7 @@ class CartController {
         const outdata = []
         console.log(djson.data)
         for (const key in djson.data) {
-            let api = `${Env.get('MARKETPLACE_CORE')}menu/slug/${djson.data[key].menu_slug}`
+            let api = `${Env.get('MARKETPLACE_CORE')}store/slug/${djson.data[key].menu_slug}/menu`
             console.log(key)
             try {
                 console.log(api)

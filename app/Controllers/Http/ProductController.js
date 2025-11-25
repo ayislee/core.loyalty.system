@@ -6,6 +6,7 @@ const Env = use('Env')
 class ProductController {
     async store_get({request, response, auth}) {
         const partner = await Partner.query().where('partner_id',auth.user.default_partner_id).first()
+        console.log(partner)
         
         const api = `${Env.get('MARKETPLACE_CORE')}store/slug/${partner.store_slug}`
         try {
@@ -41,7 +42,7 @@ class ProductController {
         .with('partner').first()
         const mp = memberPartner.toJSON()
         const company_slug = mp.partner.company_slug
-
+        console.log(company_slug)
         const api = `${Env.get('MARKETPLACE_CORE')}company/slug/${company_slug}/store`
 
         try {
@@ -70,33 +71,8 @@ class ProductController {
     async list({request, response, auth}) {
         const req = request.all()
         // return response.json(auth.user)
-        // if(!req.partner_id){
-        //     if(auth.user.default_partner_id !== null){
-        //         req.partner_id = auth.user.default_partner_id !== null
-        //     }else{
-        //         const memberPartner = await MemberPartner.query()
-        //         .where('member_id',auth.user.member_id)
-        //         .fetch()
 
-        //         if(memberPartner.rows.length > 0){
-        //             req.partner_id = memberPartner.rows[0].partner_id
-        //         }else{
-        //             return response.json({
-        //                 status: false,
-        //                 message: "unknow partner"
-        //             })
-        //         }
-        //     }
-        // }
         const partner = await Partner.query().where("partner_id", auth.user.default_partner_id).first()
-        // const memberPartner = await MemberPartner.query()
-        // .where('member_id',auth.user.member_id)
-        // .where('partner_id',req.partner_id)
-        // .with('partner').first()
-        // console.log(memberPartner)
-        // const mp = memberPartner.toJSON()
-        // console.log(mp)
-        // const store_slug = mp.partner.store_slug
         const api = `${Env.get('MARKETPLACE_CORE')}store/slug/${partner.store_slug}/menu`
         
         try {
@@ -157,6 +133,7 @@ class ProductController {
         const req = request.all()
 
         const partner = await Partner.query().where('partner_id',auth.user.default_partner_id).first()
+        console.log(partner)
         
         if(!partner) {
             return response.json({
