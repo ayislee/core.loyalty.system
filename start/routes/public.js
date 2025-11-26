@@ -8,5 +8,7 @@ const prefix='/api/v1/public'
 
 Route.group(()=>{
     Route.get('/banners','BannerController.public_get')
+    Route.get('/store','ProductController.publicStore')
+    Route.get('/product','ProductController.publicProduct')
    
 }).prefix(prefix)
