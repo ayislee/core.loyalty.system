@@ -10,5 +10,7 @@ Route.group(()=>{
     Route.get('/banners','BannerController.public_get')
     Route.get('/store','ProductController.publicStore')
     Route.get('/product','ProductController.publicProduct')
+    Route.get('/product/detail','ProductController.publicProductDetail')
+    Route.get('/product/review','ProductController.publicProductReview')
    
 }).prefix(prefix)

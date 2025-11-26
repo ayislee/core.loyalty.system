@@ -1,6 +1,8 @@
 'use strict'
 const MemberPartner = use('App/Models/MemberPartner')
 const Partner = use('App/Models/Partner')
+const ProductReview = use('App/Models/ProductReview')
+const Database = use('Database')
 const axios = use('axios')
 const Env = use('Env')
 class ProductController {
@@ -251,6 +253,95 @@ class ProductController {
             return response.json({
                 status: true,
                 data: res?.data?.data
+            })
+        } catch (error) {
+            console.log(error)
+            return response.json({
+                status: false,
+                message: error.message
+            })
+        }
+    }
+
+    async publicProductDetail({ request, response }) {
+        const { slug } = request.all()
+
+        if (!slug) {
+            return response.badRequest({
+                status: false,
+                message: 'slug is required'
+            })
+        }
+
+        try {
+            const api = `${Env.get('MARKETPLACE_CORE')}menu/slug/${slug}`
+            const res = await axios.get(api)
+            if (res?.data?.error) {
+                return response.json({
+                    status: false,
+                    message: res.data.error
+                })
+            }
+
+            const productData = res?.data?.data
+
+            // Tambahkan agregasi review
+            const agg = await Database
+                .from('product_reviews')
+                .where('item_id', productData?.item_id)
+                .avg('rating as avg_rating')
+                .count('* as total')
+                .first()
+
+            return response.json({
+                status: true,
+                data: {
+                    ...productData,
+                    review_summary: {
+                        average: agg && agg.avg_rating ? Number(agg.avg_rating) : 0,
+                        total: agg && agg.total ? Number(agg.total) : 0
+                    }
+                }
+            })
+        } catch (error) {
+            console.log(error)
+            return response.json({
+                status: false,
+                message: error.message
+            })
+        }
+    }
+
+    async publicProductReview({ request, response }) {
+        const { item_id } = request.get()
+
+        if (!item_id) {
+            return response.badRequest({
+                status: false,
+                message: 'item_id is required'
+            })
+        }
+
+        try {
+            const reviews = await ProductReview.query()
+                .where('item_id', item_id)
+                .orderBy('created_at', 'desc')
+                .fetch()
+
+            const agg = await Database
+                .from('product_reviews')
+                .where('item_id', item_id)
+                .avg('rating as avg_rating')
+                .count('* as total')
+                .first()
+
+            return response.json({
+                status: true,
+                data: {
+                    reviews: reviews.toJSON(),
+                    average: agg && agg.avg_rating ? Number(agg.avg_rating) : 0,
+                    total: agg && agg.total ? Number(agg.total) : 0
+                }
             })
         } catch (error) {
             console.log(error)
