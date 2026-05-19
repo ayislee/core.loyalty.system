@@ -1,0 +1,8 @@
+Buatkan issue.md yang berisi perencanaan untuk nanti di implementasikan oleh jonior programmer atau ai model yang lebih murah
+
+Planingnya adalah:
+1. hapus field province_id, province_name, city_id, city_type dan city_name
+2. update POST member/address dan PUT member/address atau GET member/address dan GET member/address/get apabila diperlukan terkait penambahan field tersebut
+
+
+jangan buatkan terlalu detain instruksi unit test nya. buatkan saja skenario apa yang harus di test, biarkan yang mengimplementasi detail skenarionya adalah junior programer atau model ai yang lebih murah

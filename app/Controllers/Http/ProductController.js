@@ -205,10 +205,59 @@ class ProductController {
         }
     }
 
+    async publicCategory({ request, response }) {
+        const { company_slug } = request.get()
+        const defaultCompanySlug = Env.get('DEFAULT_COMPANY_SLUG')
+
+        const activeCompanySlug = company_slug || defaultCompanySlug
+
+        if (!activeCompanySlug) {
+            return response.badRequest({
+                status: false,
+                message: 'company_slug is required'
+            })
+        }
+
+        const api = `${Env.get('MARKETPLACE_CORE')}company/slug/${activeCompanySlug}/category`
+
+        try {
+            const res = await axios.get(api)
+
+            if (res?.data?.error) {
+                return response.json({
+                    status: false,
+                    message: res.data.error
+                })
+            }
+
+            return response.json(res.data)
+        } catch (error) {
+            console.log(error)
+            return response.json({
+                status: false,
+                message: error.message
+            })
+        }
+    }
+
     async publicProduct({ request, response }) {
-        const { store_slug, company_slug } = request.get()
+        const { store_slug, company_slug, item_id, item_slug, category_display_id, category_displat_id } = request.get()
         const defaultCompanySlug = Env.get('DEFAULT_COMPANY_SLUG')
         let activeStoreSlug = store_slug
+        const activeCategoryDisplayId = category_display_id || category_displat_id
+        const params = {}
+
+        if (item_id) {
+            params.item_id = item_id
+        }
+
+        if (item_slug) {
+            params.item_slug = item_slug
+        }
+
+        if (activeCategoryDisplayId) {
+            params.category_display_id = activeCategoryDisplayId
+        }
 
         try {
             if (!activeStoreSlug) {
@@ -220,8 +269,8 @@ class ProductController {
                     })
                 }
 
-                const storeApi = `${Env.get('MARKETPLACE_CORE')}company/slug/${activeCompanySlug}/store`
-                const storeRes = await axios.get(storeApi)
+                const storeApi = `${Env.get('MARKETPLACE_CORE')}company/slug/${activeCompanySlug}/item`
+                const storeRes = await axios.get(storeApi, { params })
 
                 if (storeRes?.data?.error) {
                     return response.json({
@@ -230,18 +279,22 @@ class ProductController {
                     })
                 }
 
-                const firstStore = storeRes?.data?.data?.[0]
-                if (!firstStore?.store_slug) {
-                    return response.json({
-                        status: false,
-                        message: 'Store tidak ditemukan'
-                    })
-                }
-                activeStoreSlug = firstStore.store_slug
+                return response.json(
+                    storeRes?.data
+                )
+                // const firstStore = storeRes?.data?.data?.[0]
+                // if (!firstStore?.store_slug) {
+                //     return response.json({
+                //         status: false,
+                //         message: 'Store tidak ditemukan'
+                //     })
+                // }
+                // activeStoreSlug = firstStore.store_slug
+
             }
 
             const api = `${Env.get('MARKETPLACE_CORE')}store/slug/${activeStoreSlug}/menu`
-            const res = await axios.get(api)
+            const res = await axios.get(api, { params })
 
             if (res?.data?.error) {
                 return response.json({
@@ -263,8 +316,9 @@ class ProductController {
         }
     }
 
-    async publicProductDetail({ request, response }) {
-        const { slug } = request.all()
+    async publicProductDetail({ request, response, params }) {
+        const req = request.all()
+        const slug = req.slug || req.item_slug || req.menu_slug || params.slug
 
         if (!slug) {
             return response.badRequest({

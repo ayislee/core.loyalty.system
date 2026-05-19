@@ -39,11 +39,14 @@ class TransactionController {
         let cashier_id
         const partner = await Partner.query().where('partner_id',auth.user.default_partner_id).first()
         const api = `${Env.get('MARKETPLACE_CORE')}company/slug/${partner.company_slug}/cashier`
+        // console.log("api",api)
+        // return response.json(api)
         try {
             const cashier = await axios.get(api)
             if(cashier.data.success){
                 if(cashier.data.data.length > 0){
                     cashier_id = cashier.data.data[0].cashier_id
+                    // console.log("cashier",cashier.data.data[0])
                 }else{
                     return response.json({
                         status: false,
@@ -68,7 +71,7 @@ class TransactionController {
                 item: req.item,
                 store_id: req.store_id,
                 voucher_code: req.voucher_code,
-                ms_payment_id: req.ms_payment_id,
+                ms_payment_id: 4,
                 ms_delivery_id: req.ms_delivery_id,
                 preview_fee: req.preview_fee,
                 customer_name:`${auth.user.firstname?auth.user.firstname:'John'} ${auth.user.lastname?' '+auth.user.lastname:'Doe'}`,
@@ -84,6 +87,7 @@ class TransactionController {
                 params.voucher_type = "loyalty"
             }
             // return response.json(params)
+            console.log("params",params)
             const res = await axios.post(Env.get('MARKETPLACE_CORE')+'transaction/retail/order',params)
             if(req.preview_fee){
                 return response.json(res.data)

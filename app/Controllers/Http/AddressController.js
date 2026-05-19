@@ -33,13 +33,8 @@ class AddressController {
         address = new Address()
         address.address_name = req.address_name
         address.member_id = auth.user.member_id
-        address.province_id = req.province_id
-        address.province_name = req.province_name
-        address.city_id = req.city_id
-        address.city_name = req.city_name
-        address.city_type = req.city_type
         address.full_address = req.full_address
-        address.postal_code = req.postal_code
+        address.coordinate = req.coordinate
 
         await address.save()
         return response.json({
@@ -67,13 +62,8 @@ class AddressController {
             .first()
     
             address.address_name = req.address_name ? req.address_name : address.address_name
-            address.province_id = req.province_id ? req.province_id : address.province_id
-            address.province_name = req.province_name ? req.province_name : address.province_name
-            address.city_id = req.city_id ? req.city_id : address.city_id
-            address.city_type = req.city_type ? req.city_type : address.city_type
-            address.city_name = req.city_name ? req.city_name : address.city_name
             address.full_address = req.full_address ? req.full_address : address.full_address
-            address.postal_code = req.postal_code ? req.postal_code : address.postal_code
+            address.coordinate = Object.prototype.hasOwnProperty.call(req, 'coordinate') ? req.coordinate : address.coordinate
             await address.save()
             return response.json({
                 status: true,
