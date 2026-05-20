@@ -34,5 +34,28 @@ class ShippingController {
             })
         }
     }
+
+    async gosendCost({request, response}) {
+        const req = request.all()
+
+        const params = {
+            origin: req.origin,
+            destination: req.destination,
+            paymentType: req.paymentType
+        }
+
+        try {
+            const res = await axios.get(Env.get('MARKETPLACE_CORE') + 'transaction/shipping/gosend/cost?' + qs.stringify(params))
+            return response.json(res.data)
+        } catch (error) {
+            if (error.response && error.response.data) {
+                return response.status(error.response.status || 500).json(error.response.data)
+            }
+
+            return response.status(500).json({
+                error: error.message
+            })
+        }
+    }
 }
 module.exports = ShippingController

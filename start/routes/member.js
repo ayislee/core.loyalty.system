@@ -30,6 +30,7 @@ Route.group(()=>{
     Route.get('/transaction/get','TransactionController.get')
     Route.post('/transaction','TransactionController.create')
     Route.put('/transaction/resume','TransactionController.resume')
+    Route.get('/transaction/shipping/gosend/cost','ShippingController.gosendCost')
 
 
     // master

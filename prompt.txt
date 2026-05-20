@@ -1,8 +1,60 @@
 Buatkan issue.md yang berisi perencanaan untuk nanti di implementasikan oleh jonior programmer atau ai model yang lebih murah
 
-Planingnya adalah:
-1. hapus field province_id, province_name, city_id, city_type dan city_name
-2. update POST member/address dan PUT member/address atau GET member/address dan GET member/address/get apabila diperlukan terkait penambahan field tersebut
+referensi backend:
+## Endpoint Tambahan: GET `/transaction/shipping/gosend/cost`
 
+Tujuan:
+- Endpoint khusus untuk memanggil estimator harga GoSend.
+- Secara internal endpoint ini langsung memanggil GoSend `GET /gokilat/v10/calculate/price`.
+
+Query wajib:
+- `origin` (`lat,long`)
+- `destination` (`lat,long`)
+- `paymentType` (contoh: `3`)
+
+Contoh request:
+
+```bash
+curl -X GET "https://your-domain.com/api/v1/transaction/shipping/gosend/cost?origin=-6.1263348,106.7890888&destination=-6.200000,106.816666&paymentType=3"
+```
+
+Contoh response sukses:
+
+```json
+{
+  "success": "GOSEND shipping cost has been fetched successfully",
+  "data": {
+    "Instant": {
+      "shipment_method": "Instant",
+      "distance": 22.5,
+      "serviceable": true,
+      "active": true,
+      "price": {
+        "total_price": 57000
+      }
+    }
+  },
+  "distance_km": {
+    "Instant": 22.5
+  },
+  "max_distance_km": 25
+}
+```
+
+Contoh response gagal:
+
+```json
+{
+  "error": "origin is required and must be in lat,long format"
+}
+```
+
+Catatan:
+- `max_distance_km` diambil dari env `GOSEND_MAX_DISTANCE_KM`.
+- Jika env belum diisi/invalid, nilai `max_distance_km` akan `null`.
+
+
+Planingnya adalah:
+1. Apabila user sudah login 
 
 jangan buatkan terlalu detain instruksi unit test nya. buatkan saja skenario apa yang harus di test, biarkan yang mengimplementasi detail skenarionya adalah junior programer atau model ai yang lebih murah
