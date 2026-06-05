@@ -38,31 +38,76 @@ class TransactionController {
         const req = request.all()
         let cashier_id
         const partner = await Partner.query().where('partner_id',auth.user.default_partner_id).first()
-        const api = `${Env.get('MARKETPLACE_CORE')}company/slug/${partner.company_slug}/cashier`
-        // console.log("api",api)
-        // return response.json(api)
-        try {
-            const cashier = await axios.get(api)
-            if(cashier.data.success){
-                if(cashier.data.data.length > 0){
-                    cashier_id = cashier.data.data[0].cashier_id
-                    // console.log("cashier",cashier.data.data[0])
-                }else{
-                    return response.json({
-                        status: false,
-                        message: 'invalid cashier id'
-                    })
-                }
-            }else{
-                return response.json({
-                    status: false,
-                    message: cashier.data.error
-                })
-            }
-        } catch (error) {
+        const marketplaceCore = Env.get('MARKETPLACE_CORE')
+        const nMarketplaceCore = Env.get('NMARKETPLACE') || marketplaceCore
+        const defaultCompanySlug = Env.get('DEFAULT_COMPANY_SLUG')
+
+        if(!partner) {
             return response.json({
                 status: false,
-                message: error.message
+                message: 'invalid partner_id'
+            })
+        }
+
+        const resolveCompanySlugFromStore = async (storeSlug) => {
+            if (!storeSlug) {
+                return null
+            }
+
+            try {
+                const storeApi = `${nMarketplaceCore}store/slug/${storeSlug}`
+                const storeRes = await axios.get(storeApi)
+
+                if (storeRes?.data?.error) {
+                    return null
+                }
+
+                const storePayload = storeRes?.data?.data || storeRes?.data
+                const storeData = Array.isArray(storePayload) ? storePayload[0] : storePayload
+
+                return storeData?.company_slug || storeData?.company?.company_slug || null
+            } catch (error) {
+                return null
+            }
+        }
+
+        const storeSlug = req.store_slug || partner.store_slug
+        const companySlugFromStore = await resolveCompanySlugFromStore(storeSlug)
+
+        const companySlugs = [...new Set([
+            req.company_slug,
+            partner.company_slug,
+            defaultCompanySlug,
+            companySlugFromStore
+        ].filter(Boolean))]
+
+        if (companySlugs.length === 0) {
+            return response.json({
+                status: false,
+                message: 'company_slug is required'
+            })
+        }
+
+        let cashierErrorMessage = 'Company not found'
+        for (const companySlug of companySlugs) {
+            const api = `${marketplaceCore}company/slug/${companySlug}/cashier`
+            try {
+                const cashier = await axios.get(api)
+                if (cashier?.data?.success && cashier?.data?.data?.length > 0) {
+                    cashier_id = cashier.data.data[0].cashier_id
+                    break
+                }
+
+                cashierErrorMessage = cashier?.data?.error || 'invalid cashier id'
+            } catch (error) {
+                cashierErrorMessage = error.message
+            }
+        }
+
+        if (!cashier_id) {
+            return response.json({
+                status: false,
+                message: cashierErrorMessage
             })
         }
 
@@ -71,7 +116,7 @@ class TransactionController {
                 item: req.item,
                 store_id: req.store_id,
                 voucher_code: req.voucher_code,
-                ms_payment_id: 4,
+                ms_payment_id: Env.get('MARKETPLACE_CORE_PAYMENT_ID') || Env.get('MS_PAYMENT_ID') || 4,
                 ms_delivery_id: req.ms_delivery_id,
                 preview_fee: req.preview_fee,
                 customer_name:`${auth.user.firstname?auth.user.firstname:'John'} ${auth.user.lastname?' '+auth.user.lastname:'Doe'}`,
@@ -79,9 +124,12 @@ class TransactionController {
                 customer_email: auth.user.email,
                 cashier_id: cashier_id,
                 shipping_destination: req.shipping_destination,
+                shipping_destination_name: req.shipping_destination_name,
                 shipping_destination_address: req.shipping_destination_address,
+                shipping_destination_coordinate: req.shipping_destination_coordinate,
                 shipping_service: req.shipping_service,
-                pickup_date: req.pickup_date
+                pickup_date: req.pickup_date,
+                transaction_url_referer: Env.get('APP_URL')
             }
             if(req.voucher_code){
                 params.voucher_type = "loyalty"

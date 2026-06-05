@@ -55,6 +55,7 @@ Catatan:
 
 
 Planingnya adalah:
-1. Apabila user sudah login 
+
+
 
 jangan buatkan terlalu detain instruksi unit test nya. buatkan saja skenario apa yang harus di test, biarkan yang mengimplementasi detail skenarionya adalah junior programer atau model ai yang lebih murah

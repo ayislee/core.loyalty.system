@@ -168,33 +168,41 @@ class ProductController {
     }
 
     async publicStore({ request, response }) {
-        const { company_slug } = request.get()
+        const { company_slug, store_slug } = request.get()
         const defaultCompanySlug = Env.get('DEFAULT_COMPANY_SLUG')
+        const marketplaceCore = Env.get('MARKETPLACE_CORE')
+        const nMarketplaceCore = Env.get('NMARKETPLACE') || marketplaceCore
 
         const activeCompanySlug = company_slug || defaultCompanySlug
 
-        if (!activeCompanySlug) {
+        if (!store_slug && !activeCompanySlug) {
             return response.badRequest({
                 status: false,
-                message: 'company_slug is required'
+                message: 'store_slug or company_slug is required'
             })
         }
 
-        const api = `${Env.get('MARKETPLACE_CORE')}company/slug/${activeCompanySlug}/store`
+        const api = store_slug
+            ? `${nMarketplaceCore}store/slug/${store_slug}`
+            : `${marketplaceCore}company/slug/${activeCompanySlug}/store`
 
         try {
             const res = await axios.get(api)
 
-            if (res.data.error) {
+            if (res?.data?.error) {
                 return response.json({
                     status: false,
                     message: res.data.error
                 })
             }
 
+            const payload = store_slug
+                ? (res?.data?.data || res?.data)
+                : res?.data?.data
+
             return response.json({
                 status: true,
-                data: res.data.data
+                data: payload
             })
         } catch (error) {
             console.log(error)

@@ -36,16 +36,41 @@ class ShippingController {
     }
 
     async gosendCost({request, response}) {
-        const req = request.all()
+        const query = request.get()
+        const normalizeCoordinate = (value) => {
+            if (!value && value !== 0) {
+                return ''
+            }
+
+            if (Array.isArray(value)) {
+                return value.join(',').replace(/\s+/g, '')
+            }
+
+            return String(value).replace(/\s+/g, '')
+        }
+
+        const isLatLong = (value) => /^-?\d+(\.\d+)?,-?\d+(\.\d+)?$/.test(value)
 
         const params = {
-            origin: req.origin,
-            destination: req.destination,
-            paymentType: req.paymentType
+            origin: normalizeCoordinate(query.origin),
+            destination: normalizeCoordinate(query.destination),
+            paymentType: query.paymentType
+        }
+
+        if (!isLatLong(params.origin)) {
+            return response.status(400).json({
+                error: 'origin is required and must be in lat,long format'
+            })
+        }
+
+        if (!isLatLong(params.destination)) {
+            return response.status(400).json({
+                error: 'destination is required and must be in lat,long format'
+            })
         }
 
         try {
-            const res = await axios.get(Env.get('MARKETPLACE_CORE') + 'transaction/shipping/gosend/cost?' + qs.stringify(params))
+            const res = await axios.get(Env.get('MARKETPLACE_CORE') + 'transaction/shipping/gosend/cost', { params })
             return response.json(res.data)
         } catch (error) {
             if (error.response && error.response.data) {
