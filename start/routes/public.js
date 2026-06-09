@@ -13,5 +13,6 @@ Route.group(()=>{
     Route.get('/product','ProductController.publicProduct')
     Route.get('/product/detail','ProductController.publicProductDetail')
     Route.get('/product/review','ProductController.publicProductReview')
+    Route.post('/activity-history/product-page','MemberController.record_product_page_visit')
    
 }).prefix(prefix)

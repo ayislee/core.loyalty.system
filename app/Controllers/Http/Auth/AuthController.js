@@ -9,6 +9,7 @@ const Env = use('Env')
 const moment = use('moment')
 const MemberPartner = use('App/Models/MemberPartner')
 const Partner = use('App/Models/Partner')
+const MemberActivityLogger = use('App/Helpers/MemberActivityLogger')
 class AuthController {
 
     async getDefaultPartner(request) {
@@ -219,6 +220,18 @@ class AuthController {
                 token: token.toString()
             })
 
+            await MemberActivityLogger.record({
+                memberId: member.member_id,
+                activityType: 'login_otp_requested',
+                request,
+                description: isNewMember ? 'Request OTP login untuk member baru' : 'Request OTP login',
+                metadata: {
+                    lid_type: req.lid_type,
+                    is_new_member: isNewMember,
+                    partner_id: partner.partner_id
+                }
+            })
+
             return response.json({
                 status: true,
                 message: `Token already send valid in ${Env.get('TOKEN_VALIDITY_PERIODE')} minute(s)`,
@@ -287,6 +300,17 @@ class AuthController {
                 }
 
                 const token = await auth.authenticator(request.all().lid_type).generate(data)
+                await MemberActivityLogger.record({
+                    memberId: data.member_id,
+                    activityType: 'login_success',
+                    request,
+                    description: 'Login member berhasil',
+                    metadata: {
+                        lid_type: request.all().lid_type,
+                        partner_id: partnerId
+                    }
+                })
+
                 return response.json({
                     status: true,
                     message: 'success',

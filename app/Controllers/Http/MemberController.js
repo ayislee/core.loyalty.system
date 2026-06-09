@@ -21,6 +21,8 @@ const Partner = use('App/Models/Partner')
 const MemberPartner = use('App/Models/MemberPartner')
 const VoucherRedeemConfirmation = use('App/Lib/VoucherRedeemConfirmation')
 const MemberContactVerification = use('App/Models/MemberContactVerification')
+const MemberActivityHistory = use('App/Models/MemberActivityHistory')
+const MemberActivityLogger = use('App/Helpers/MemberActivityLogger')
 const Email = use('App/Lib/Email')
 const WhatsappAPI = use('App/Lib/WhatsappAPI')
 const uuid = use('uuid')
@@ -359,6 +361,57 @@ class MemberController {
         })
     }
 
+    async activity_history({request, response, auth}) {
+        const page = request.all().page || 1
+        const rows = request.all().rows || 10
+
+        const data = await MemberActivityHistory.query()
+            .where('member_id', auth.user.member_id)
+            .filter(request.all().filter)
+            .order(request.all().order)
+            .orderBy('member_activity_history_id', 'desc')
+            .paginate(page, rows)
+
+        return response.json({
+            status: true,
+            data
+        })
+    }
+
+    async record_product_page_visit({request, response, auth}) {
+        const itemSlug = request.all().item_slug || request.all().slug || null
+        const isDetailVisit = Boolean(itemSlug)
+        const memberId = auth?.user?.member_id || null
+        const visitorId = memberId ? null : `${request.all().visitor_id || ''}`.trim().slice(0, 100)
+
+        if (!memberId && !visitorId) {
+            return response.json({
+                status: false,
+                message: 'visitor_id is required'
+            })
+        }
+
+        await MemberActivityLogger.record({
+            memberId,
+            visitorId,
+            activityType: isDetailVisit ? 'product_detail_visited' : 'product_page_visited',
+            request,
+            description: isDetailVisit ? 'Mengunjungi detail produk' : 'Mengunjungi halaman produk',
+            metadata: {
+                page: request.all().page || (isDetailVisit ? `/product/${itemSlug}` : '/product'),
+                item_slug: itemSlug,
+                item_id: request.all().item_id || null,
+                category_display_id: request.all().category_display_id || null
+            },
+            dedupeSeconds: 10
+        })
+
+        return response.json({
+            status: true,
+            message: 'activity recorded'
+        })
+    }
+
     async profile_update({request, response, auth}){
 
         const data = await Member.query()
@@ -381,6 +434,16 @@ class MemberController {
         }
 
         await data.save()
+
+        await MemberActivityLogger.record({
+            memberId: auth.user.member_id,
+            activityType: 'profile_updated',
+            request,
+            description: 'Update profil member',
+            metadata: {
+                changed_fields: Object.keys(req).filter((field) => ['firstname', 'lastname', 'image_profile'].includes(field))
+            }
+        })
 
         return response.json({
             status: true,
@@ -429,6 +492,13 @@ class MemberController {
         member.image_profile = imageUrl
         await member.save()
 
+        await MemberActivityLogger.record({
+            memberId: auth.user.member_id,
+            activityType: 'profile_photo_updated',
+            request,
+            description: 'Update foto profil member'
+        })
+
         return response.json({
             status: true,
             message: 'photo uploaded',
@@ -471,6 +541,17 @@ class MemberController {
 
         const activeVerification = await this.findActiveContactVerification(auth.user.member_id, 'email')
         if (activeVerification) {
+            await MemberActivityLogger.record({
+                memberId: auth.user.member_id,
+                activityType: 'email_verification_requested',
+                request,
+                description: 'Membuka token verifikasi email yang masih aktif',
+                metadata: {
+                    target: activeVerification.target,
+                    already_active: true
+                }
+            })
+
             return response.json({
                 status: true,
                 message: 'Token verifikasi email masih aktif',
@@ -500,6 +581,16 @@ class MemberController {
             type: 'email',
             target: email,
             token
+        })
+
+        await MemberActivityLogger.record({
+            memberId: auth.user.member_id,
+            activityType: 'email_verification_requested',
+            request,
+            description: 'Request verifikasi email',
+            metadata: {
+                target: email
+            }
         })
 
         return response.json({
@@ -574,6 +665,16 @@ class MemberController {
         verification.status = 'verified'
         await verification.save()
 
+        await MemberActivityLogger.record({
+            memberId: auth.user.member_id,
+            activityType: 'email_verified',
+            request,
+            description: 'Email member berhasil diverifikasi',
+            metadata: {
+                target: email
+            }
+        })
+
         return response.json({
             status: true,
             message: 'email verified',
@@ -614,6 +715,17 @@ class MemberController {
 
         const activeVerification = await this.findActiveContactVerification(auth.user.member_id, 'phone')
         if (activeVerification) {
+            await MemberActivityLogger.record({
+                memberId: auth.user.member_id,
+                activityType: 'phone_verification_requested',
+                request,
+                description: 'Membuka token verifikasi nomor telepon yang masih aktif',
+                metadata: {
+                    target: activeVerification.target,
+                    already_active: true
+                }
+            })
+
             return response.json({
                 status: true,
                 message: 'Token verifikasi nomor telepon masih aktif',
@@ -643,6 +755,16 @@ class MemberController {
             type: 'phone',
             target: phone,
             token
+        })
+
+        await MemberActivityLogger.record({
+            memberId: auth.user.member_id,
+            activityType: 'phone_verification_requested',
+            request,
+            description: 'Request verifikasi nomor telepon',
+            metadata: {
+                target: phone
+            }
         })
 
         return response.json({
@@ -716,6 +838,16 @@ class MemberController {
 
         verification.status = 'verified'
         await verification.save()
+
+        await MemberActivityLogger.record({
+            memberId: auth.user.member_id,
+            activityType: 'phone_verified',
+            request,
+            description: 'Nomor telepon member berhasil diverifikasi',
+            metadata: {
+                target: phone
+            }
+        })
 
         return response.json({
             status: true,

@@ -1,139 +1,139 @@
-# Issue: Review Produk Setelah Transaksi Selesai
+# Issue: History Aktivitas Member dengan IP dan User Agent
 
 ## Ringkasan
-Member perlu bisa memberikan review produk berdasarkan `item_id` setelah transaksi benar-benar selesai, yaitu ketika konsumen sudah menerima barang. Review tidak boleh dibuat dari produk yang belum pernah dibeli, transaksi yang belum selesai, atau transaksi milik member lain.
+Tambahkan pencatatan history aktivitas member yang menyimpan informasi teknis request seperti alamat IP dan user agent. Data ini dibutuhkan untuk audit sederhana, investigasi masalah login, dan melihat perangkat atau browser yang digunakan member.
 
-Saat ini backend sudah memiliki tabel `product_reviews` dan endpoint public untuk menampilkan review produk. Fitur yang perlu ditambahkan adalah flow member untuk membuat review dari transaksi yang eligible.
+Fitur ini melibatkan backend sebagai sumber pencatatan data, dan frontend sebagai tempat menampilkan informasi history member jika diperlukan.
 
 ## Tujuan
-1. Member bisa memberi rating dan komentar untuk produk yang sudah dibeli.
-2. Review hanya bisa dibuat setelah transaksi selesai atau barang diterima.
-3. Review hanya bisa dibuat untuk `item_id` yang ada di detail transaksi member tersebut.
-4. Review tidak boleh dibuat berulang untuk item yang sama pada transaksi yang sama.
-5. Review yang berhasil dibuat ikut tampil di halaman detail produk dan ringkasan rating produk.
-
-## Kondisi Saat Ini
-1. Backend sudah memiliki tabel `product_reviews` dengan field utama `item_id`, `member_id`, `rating`, dan `comment`.
-2. Backend sudah memiliki model `ProductReview`.
-3. Endpoint public `GET /api/v1/public/product/review` sudah tersedia untuk membaca review berdasarkan `item_id`.
-4. Halaman product detail frontend sudah menampilkan ringkasan dan daftar review.
-5. Belum ada endpoint member untuk membuat review.
-6. Belum ada validasi bahwa review hanya boleh dibuat dari transaksi yang selesai.
-7. Belum ada UI review dari riwayat transaksi/order member.
+1. Backend mencatat aktivitas penting member beserta IP address dan user agent.
+2. Data history bisa ditelusuri per member.
+3. Admin atau member dapat melihat daftar history aktivitas sesuai kebutuhan UI yang tersedia.
+4. Pencatatan tidak mengganggu flow utama seperti login, update profile, atau verifikasi kontak.
 
 ## Scope Backend `core.loyalty.system`
-1. Tentukan sumber status transaksi selesai.
-   - Gunakan data status transaksi yang sudah tersedia dari response transaction list/detail.
-   - Pastikan definisi transaksi selesai jelas, misalnya status pembayaran/approval sukses dan status pengiriman sudah diterima/selesai.
-   - Jika nama status final berasal dari marketplace core, dokumentasikan status yang dianggap eligible.
+1. Buat struktur penyimpanan history member.
+   - Tambahkan tabel baru, misalnya `member_activity_histories` atau nama lain yang sesuai pola project.
+   - Field minimal yang disarankan:
+     - `id`
+     - `member_id`
+     - `activity_type`
+     - `ip_address`
+     - `user_agent`
+     - `description`
+     - `metadata`
+     - `created_at`
+     - `updated_at`
+   - `metadata` dapat dipakai untuk data tambahan sederhana dalam bentuk JSON/text jika pola database mendukung.
 
-2. Update struktur data review bila diperlukan.
-   - Tabel `product_reviews` saat ini belum menyimpan referensi transaksi.
-   - Tambahkan field referensi transaksi agar review bisa dikaitkan dengan pembelian yang valid.
-   - Field yang disarankan:
-     - `transaction_id` atau `transaction_number`, pilih yang paling stabil dari data transaksi.
-     - `transaction_detail_id` jika tersedia dari payload transaksi.
-   - Tambahkan constraint/index untuk mencegah duplicate review, misalnya kombinasi `member_id`, `item_id`, dan referensi transaksi.
+2. Buat model untuk history member.
+   - Tambahkan model baru sesuai standar AdonisJS yang digunakan project.
+   - Pastikan relasi ke member dapat dibuat jika pola model existing mendukung.
 
-3. Buat endpoint create review untuk member.
-   - Contoh endpoint: `POST /api/v1/member/product/review`.
-   - Endpoint wajib memakai auth member.
-   - Input minimal:
-     - `transaction_id` atau `transaction_number`
-     - `item_id`
-     - `rating` angka 1 sampai 5
-     - `comment` opsional
-   - Backend memvalidasi transaksi milik member yang sedang login.
-   - Backend memvalidasi `item_id` ada di detail transaksi tersebut.
-   - Backend memvalidasi transaksi sudah selesai/barang sudah diterima.
-   - Backend menolak jika item tersebut sudah pernah direview untuk transaksi yang sama.
-   - Backend menyimpan review jika semua validasi lolos.
+3. Buat helper/service pencatatan history.
+   - Buat helper agar pencatatan history tidak tersebar sebagai duplikasi kode.
+   - Helper menerima parameter minimal:
+     - member id
+     - jenis aktivitas
+     - request object
+     - deskripsi opsional
+     - metadata opsional
+   - Helper mengambil IP dari request dengan cara yang konsisten.
+   - Helper mengambil user agent dari header request.
+   - Jika penyimpanan history gagal, jangan sampai membuat proses utama gagal kecuali aktivitas tersebut memang wajib diaudit.
 
-4. Buat endpoint eligibility review bila diperlukan.
-   - Contoh endpoint: `GET /api/v1/member/product/review/eligibility`.
-   - Tujuannya membantu frontend menampilkan tombol `Review` atau label `Sudah direview`.
-   - Response sebaiknya memberi informasi per item:
-     - `item_id`
-     - `can_review`
-     - `already_reviewed`
-     - alasan singkat jika tidak eligible.
-   - Jika data eligibility bisa dimasukkan langsung ke endpoint list/detail transaksi, endpoint terpisah tidak wajib dibuat.
+4. Tentukan aktivitas yang dicatat.
+   - Login berhasil.
+   - Request token login/OTP jika member sudah diketahui.
+   - Update profile member.
+   - Request verifikasi email.
+   - Request verifikasi nomor telepon.
+   - Verifikasi email berhasil.
+   - Verifikasi nomor telepon berhasil.
+   - Logout jika endpoint logout tersedia.
+   - Aktivitas lain bisa ditambahkan nanti tanpa mengubah struktur utama.
 
-5. Pertahankan endpoint public review.
-   - Endpoint public review tetap membaca dari `product_reviews`.
-   - Setelah review baru dibuat, detail produk harus tetap bisa menampilkan average rating dan total review.
-   - Jika perlu, tambahkan data sederhana seperti nama member yang dimasking, tetapi jangan tampilkan data pribadi berlebihan.
+5. Buat endpoint membaca history.
+   - Contoh endpoint member: `GET /api/v1/member/activity-history`.
+   - Endpoint wajib menggunakan auth member.
+   - Response berisi daftar history milik member yang sedang login.
+   - Tambahkan pagination atau limit sederhana agar response tidak terlalu besar.
+   - Urutkan dari aktivitas terbaru.
+
+6. Pertimbangkan endpoint admin jika sudah ada area admin.
+   - Jika admin membutuhkan audit member, buat endpoint berdasarkan `member_id`.
+   - Endpoint admin harus memakai middleware/otorisasi admin yang sudah ada.
+   - Jika belum ada kebutuhan admin, cukup siapkan struktur backend agar mudah ditambahkan nanti.
+
+7. Keamanan dan privasi.
+   - Jangan simpan token OTP, password, atau data sensitif lain di `metadata`.
+   - Jangan tampilkan data history member lain ke user biasa.
+   - Jika aplikasi berada di balik proxy/load balancer, pastikan IP yang dicatat menggunakan sumber yang benar sesuai konfigurasi server.
 
 ## Scope Frontend `client.loyalty.system`
-1. Update halaman riwayat transaksi/order.
-   - Area utama yang kemungkinan perlu diubah adalah halaman daftar transaksi member.
-   - Tampilkan tombol `Review` pada item transaksi yang sudah selesai dan belum direview.
-   - Jika item sudah direview, tampilkan status `Sudah direview`.
-   - Jika transaksi belum selesai, jangan tampilkan tombol review atau tampilkan disabled state yang jelas.
+1. Tambahkan definisi API baru.
+   - Tambahkan endpoint history member di `src/utils/api.js`.
+   - Gunakan helper API yang sudah tersedia di project.
 
-2. Buat modal/form review.
-   - Form menampilkan produk yang akan direview, minimal nama produk dan gambar jika tersedia.
-   - Input rating 1 sampai 5 bintang.
-   - Input komentar opsional.
-   - Tombol submit memiliki loading state.
-   - Jika submit berhasil, modal ditutup dan status item berubah menjadi `Sudah direview`.
-   - Jika backend menolak karena transaksi belum selesai atau review duplikat, tampilkan pesan error yang mudah dipahami.
+2. Tampilkan history aktivitas member.
+   - Lokasi yang disarankan adalah halaman Profile atau halaman baru di area member.
+   - Tampilkan informasi utama:
+     - waktu aktivitas
+     - jenis aktivitas
+     - deskripsi
+     - IP address
+     - ringkasan user agent atau perangkat
+   - Jika user agent terlalu panjang, tampilkan ringkasannya dan sediakan detail hanya jika diperlukan.
 
-3. Integrasi API frontend.
-   - Tambahkan endpoint baru di `src/utils/api.js`.
-   - Gunakan helper `Api` yang sudah ada.
-   - Setelah review berhasil, refresh data transaksi atau update state lokal agar tombol tidak bisa diklik ulang.
+3. State dan UX.
+   - Tampilkan loading state saat data diambil.
+   - Tampilkan empty state jika belum ada history.
+   - Tampilkan error message sederhana jika API gagal.
+   - Gunakan pagination/load more jika backend menyediakan pagination.
 
-4. Dampak ke halaman produk.
-   - Halaman product detail sudah menampilkan review.
-   - Pastikan setelah review dibuat, data review terbaru bisa muncul saat halaman produk dibuka ulang.
-   - Tidak perlu membuat perubahan besar pada desain halaman product detail kecuali diperlukan untuk konsistensi data.
+4. Format tampilan.
+   - Gunakan format tanggal yang konsisten dengan halaman lain.
+   - Jangan membuat tampilan terlalu ramai; history harus mudah discan.
+   - Jangan menampilkan metadata mentah yang sulit dibaca user.
 
-## Alur User
-1. Member membuka halaman riwayat transaksi.
-2. Sistem menampilkan daftar transaksi dan item yang pernah dibeli.
-3. Untuk transaksi yang sudah selesai/barang diterima, item yang belum direview memiliki tombol `Review`.
-4. Member klik `Review`.
-5. Frontend menampilkan modal rating dan komentar.
-6. Member mengisi rating dan komentar, lalu submit.
-7. Backend memvalidasi transaksi, item, status selesai, dan duplikasi review.
-8. Jika valid, backend menyimpan review.
-9. Frontend menampilkan pesan sukses dan menandai item sebagai sudah direview.
-10. Review ikut tampil pada halaman detail produk.
+## Alur Data
+1. Member melakukan aktivitas, misalnya login berhasil atau update profile.
+2. Backend mengambil `member_id`, IP address, dan user agent dari request.
+3. Backend menyimpan record history dengan jenis aktivitas yang sesuai.
+4. Frontend memanggil endpoint history member.
+5. Backend mengembalikan daftar history milik member tersebut.
+6. Frontend menampilkan daftar history aktivitas kepada user.
 
 ## Acceptance Criteria
-1. Member hanya bisa membuat review untuk produk yang ada di transaksi miliknya.
-2. Review hanya bisa dibuat jika transaksi sudah selesai atau barang sudah diterima.
-3. Rating wajib diisi dengan nilai 1 sampai 5.
-4. Komentar boleh kosong.
-5. Member tidak bisa membuat review duplikat untuk item yang sama pada transaksi yang sama.
-6. Review yang berhasil dibuat tersimpan dengan `member_id` dan `item_id` yang benar.
-7. Halaman riwayat transaksi menampilkan tombol review hanya pada item yang eligible.
-8. Item yang sudah direview tidak menampilkan tombol review aktif lagi.
-9. Review baru ikut dihitung pada average rating dan total review produk.
+1. Setiap login berhasil mencatat history dengan `member_id`, IP address, user agent, dan waktu aktivitas.
+2. Aktivitas profile dan verifikasi kontak yang ditentukan ikut tercatat.
+3. Endpoint history hanya mengembalikan data milik member yang sedang login.
+4. Response history diurutkan dari yang terbaru.
+5. Frontend dapat menampilkan daftar history dengan loading, empty, dan error state.
+6. Kegagalan pencatatan history tidak membuat flow utama gagal.
+7. Data sensitif seperti token OTP tidak tersimpan di history.
 
 ## Out of Scope
-1. Edit review setelah dikirim.
-2. Hapus review oleh member.
-3. Upload foto/video review.
-4. Moderasi review oleh admin.
-5. Balasan review dari merchant.
-6. Reward poin untuk review.
+1. Analisis detail device/browser yang kompleks.
+2. Geolocation berdasarkan IP.
+3. Export history ke file.
+4. Filter lanjutan berdasarkan tanggal atau aktivitas.
+5. Notifikasi keamanan ke email/WhatsApp saat login perangkat baru.
+6. Dashboard audit lengkap untuk admin, kecuali memang sudah ada kebutuhan terpisah.
 
 ## Skenario Test High Level
-1. Member membuat review untuk item dari transaksi yang sudah selesai.
-2. Member mencoba review item dari transaksi yang belum selesai.
-3. Member mencoba review item yang tidak ada di transaksi tersebut.
-4. Member mencoba review transaksi milik member lain.
-5. Member mencoba membuat review kedua untuk item dan transaksi yang sama.
-6. Submit review dengan rating kosong atau di luar 1 sampai 5.
-7. Review berhasil tampil di daftar review product detail.
-8. Average rating dan total review produk berubah setelah review baru dibuat.
-9. Tombol review di frontend berubah menjadi `Sudah direview` setelah submit berhasil.
+1. Login berhasil mencatat history member.
+2. Update profile mencatat history member.
+3. Request dan verifikasi email/nomor telepon mencatat history sesuai aktivitas.
+4. Endpoint history tidak bisa diakses tanpa login.
+5. Member hanya bisa melihat history miliknya sendiri.
+6. History tetap tersimpan walaupun user agent kosong atau IP tidak tersedia.
+7. Frontend menampilkan daftar history, empty state, dan error state.
+8. Flow login/update profile tetap berhasil walaupun pencatatan history mengalami error.
 
 ## Definition of Done
-1. Endpoint create review member tersedia dan tervalidasi.
-2. Backend memastikan review hanya bisa dibuat dari transaksi selesai milik member.
-3. Frontend menyediakan tombol dan modal review pada transaksi yang eligible.
-4. Review baru tampil di product detail dan ringkasan rating produk.
+1. Tabel dan model history member tersedia.
+2. Helper/service pencatatan history tersedia dan digunakan pada aktivitas yang disepakati.
+3. Endpoint history member tersedia dan aman.
+4. Frontend memiliki integrasi API dan tampilan history member.
 5. Skenario test high level sudah dicek.

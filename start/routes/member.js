@@ -12,6 +12,8 @@ Route.group(()=>{
     Route.post('/profile/email/verify','MemberController.verify_email')
     Route.post('/profile/phone/request','MemberController.request_phone_verification')
     Route.post('/profile/phone/verify','MemberController.verify_phone')
+    Route.get('/activity-history','MemberController.activity_history').validator('Pages')
+    Route.post('/activity-history/product-page','MemberController.record_product_page_visit')
     Route.get('/points','MemberController.points').validator('Pages')
     Route.get('/vouchers','MemberController.vouchers').validator('Pages')
     Route.post('/redeem','MemberController.redeem').validator('VoucherID')
