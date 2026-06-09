@@ -11,6 +11,68 @@ const MemberPartner = use('App/Models/MemberPartner')
 const Partner = use('App/Models/Partner')
 class AuthController {
 
+    async getDefaultPartner(request) {
+        const req = request.all()
+
+        if (req.partner_id) {
+            const partner = await Partner.query().where('partner_id', req.partner_id).first()
+            if (partner) return partner
+        }
+
+        if (req.company_slug) {
+            const partner = await Partner.query().where('company_slug', req.company_slug).first()
+            if (partner) return partner
+        }
+
+        const defaultCompanySlug = Env.get('DEFAULT_COMPANY_SLUG')
+        if (defaultCompanySlug) {
+            const partner = await Partner.query().where('company_slug', defaultCompanySlug).first()
+            if (partner) return partner
+        }
+
+        return Partner.query().first()
+    }
+
+    async getMemberPartner(member) {
+        if (member.default_partner_id) {
+            const partner = await Partner.query().where('partner_id', member.default_partner_id).first()
+            if (partner) return partner
+        }
+
+        const memberPartner = await MemberPartner.query()
+            .where('member_id', member.member_id)
+            .first()
+
+        if (memberPartner) {
+            return Partner.query().where('partner_id', memberPartner.partner_id).first()
+        }
+
+        return null
+    }
+
+    async ensureMemberPartner(member, partner) {
+        if (!partner) return null
+
+        if (member.default_partner_id != partner.partner_id) {
+            member.default_partner_id = partner.partner_id
+            await member.save()
+        }
+
+        let memberPartner = await MemberPartner.query()
+            .where('member_id', member.member_id)
+            .where('partner_id', partner.partner_id)
+            .first()
+
+        if (!memberPartner) {
+            memberPartner = new MemberPartner()
+            memberPartner.member_id = member.member_id
+            memberPartner.partner_id = partner.partner_id
+            await memberPartner.save()
+        }
+
+        return memberPartner
+    }
+
 
 	async user_register({request, response}) {
         try {
@@ -103,39 +165,73 @@ class AuthController {
 
 
     async request_token({request, response}) {
-        // return request.all()
-        let token = Math.floor(Math.random() * (999999 - 100000 + 1)) + 100000;
-        // return response.json(request.all())
+        try {
+            let token = Math.floor(Math.random() * (999999 - 100000 + 1)) + 100000;
+            const req = request.all()
+            const m = Member.query()
+            let isNewMember = false
 
-        const m = Member.query()
-        if(request.all().lid_type == 'phone'){
-            m.where('phone',request.all().phone)
-        }else{
-            m.where('email',request.all().email)
-        }
-        
-        const member = await m.first()
-        // return member
-        token = token.toString()
-        // return token
-        if(!member){
+            if(req.lid_type == 'phone'){
+                m.where('phone', req.phone)
+            }else{
+                m.where('email', req.email)
+            }
+            
+            let member = await m.first()
+            const hasPartnerContext = req.partner_id || req.company_slug
+            let partner = hasPartnerContext ? await this.getDefaultPartner(request) : null
+
+            if (member && !partner) {
+                partner = await this.getMemberPartner(member)
+            }
+
+            if (!partner) {
+                partner = await this.getDefaultPartner(request)
+            }
+
+            if (!partner) {
+                return response.json({
+                    status: false,
+                    message: 'Default partner is not configured'
+                })
+            }
+
+            if(!member){
+                member = new Member()
+                member.phone = req.lid_type == 'phone' ? req.phone : null
+                member.email = req.lid_type == 'email' ? req.email : null
+                member.lid = req.lid_type == 'phone' ? req.phone : req.email
+                member.status = 'not active'
+                member.default_partner_id = partner.partner_id
+                await member.save()
+                isNewMember = true
+            }
+
+            await this.ensureMemberPartner(member, partner)
+
+            token = token.toString()
+            member.token = token
+            await member.save()
+
+            Event.fire('token::member', {
+                member: member.toJSON(),
+                lid_type: req.lid_type,
+                token: token.toString()
+            })
+
+            return response.json({
+                status: true,
+                message: `Token already send valid in ${Env.get('TOKEN_VALIDITY_PERIODE')} minute(s)`,
+                registered: !isNewMember,
+                is_new_member: isNewMember
+            })
+        } catch (error) {
+            console.log(error)
             return response.json({
                 status: false,
-                message: 'You not registered'
+                message: 'Something wrong'
             })
         }
-
-        member.token = token
-        await member.save()
-        Event.fire('token::member', {
-            member: member.toJSON(),
-            lid_type: request.all().lid_type,
-            token:token.toString()
-        })
-        return response.json({
-            status: true,
-            message: `Token already send valid in ${Env.get('TOKEN_VALIDITY_PERIODE')} minute(s)`
-        })
     }
 
     async login_token({request, response, auth}) {
@@ -165,9 +261,30 @@ class AuthController {
                 data.status = 'active'
                 await data.save()
 
-                const partner = await Partner.query().where('partner_id',data.default_partner_id).first()
-
                 const jdata = data.toJSON()
+                let partnerId = jdata.default_partner_id !== null && jdata.default_partner_id !== undefined
+                    ? jdata.default_partner_id
+                    : jdata?.member_partners?.[0]?.partner_id
+                let partner = partnerId
+                    ? await Partner.query().where('partner_id', partnerId).first()
+                    : null
+
+                if (!partner && jdata?.member_partners?.[0]?.partner_id) {
+                    partnerId = jdata.member_partners[0].partner_id
+                    partner = await Partner.query().where('partner_id', partnerId).first()
+                }
+
+                if (!partner) {
+                    return response.json({
+                        status: false,
+                        message: 'invalid partner'
+                    })
+                }
+
+                if (data.default_partner_id != partner.partner_id) {
+                    data.default_partner_id = partner.partner_id
+                    await data.save()
+                }
 
                 const token = await auth.authenticator(request.all().lid_type).generate(data)
                 return response.json({
@@ -175,10 +292,10 @@ class AuthController {
                     message: 'success',
                     data: {...token,
                         user:data,
-                        partner_id:jdata.default_partner_id !== null ? jdata.default_partner_id : jdata?.member_partners[0]?.partner_id,
+                        partner_id: partnerId,
                         partner: {
                             primary_color: partner.primary_color,
-                            primary_color_hover: partner.primary_color_hover
+                            primary_color_hover: partner.primary_color_hover || partner.primary_color
                         }
                     }
                 })

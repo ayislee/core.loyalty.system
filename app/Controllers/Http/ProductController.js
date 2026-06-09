@@ -2,6 +2,7 @@
 const MemberPartner = use('App/Models/MemberPartner')
 const Partner = use('App/Models/Partner')
 const ProductReview = use('App/Models/ProductReview')
+const ProductReviewEligibility = use('App/Helpers/ProductReviewEligibility')
 const Database = use('Database')
 const axios = use('axios')
 const Env = use('Env')
@@ -363,6 +364,121 @@ class ProductController {
                         average: agg && agg.avg_rating ? Number(agg.avg_rating) : 0,
                         total: agg && agg.total ? Number(agg.total) : 0
                     }
+                }
+            })
+        } catch (error) {
+            console.log(error)
+            return response.json({
+                status: false,
+                message: error.message
+            })
+        }
+    }
+
+    async createReview({ request, response, auth }) {
+        const req = request.all()
+        const itemId = Number(req.item_id)
+        const rating = Number(req.rating)
+        const transactionIdentifier = req.transaction_number || req.transaction_id
+
+        if (!transactionIdentifier) {
+            return response.badRequest({
+                status: false,
+                message: 'transaction_id atau transaction_number wajib diisi'
+            })
+        }
+
+        if (!Number.isInteger(itemId) || itemId <= 0) {
+            return response.badRequest({
+                status: false,
+                message: 'item_id tidak valid'
+            })
+        }
+
+        if (!Number.isInteger(rating) || rating < 1 || rating > 5) {
+            return response.badRequest({
+                status: false,
+                message: 'Rating wajib diisi dengan nilai 1 sampai 5'
+            })
+        }
+
+        const toNullableInteger = (value) => {
+            const parsed = Number(value)
+            return Number.isInteger(parsed) ? parsed : null
+        }
+
+        try {
+            const transaction = await ProductReviewEligibility.findMemberTransaction({
+                email: auth.user.email,
+                transactionId: req.transaction_id,
+                transactionNumber: req.transaction_number
+            })
+
+            if (!transaction) {
+                return response.status(404).json({
+                    status: false,
+                    message: 'Transaksi tidak ditemukan untuk member ini'
+                })
+            }
+
+            const transactionDetail = ProductReviewEligibility.findTransactionDetailByItemId(transaction, itemId)
+            if (!transactionDetail) {
+                return response.status(422).json({
+                    status: false,
+                    message: 'Produk tidak ditemukan pada transaksi ini'
+                })
+            }
+
+            if (!ProductReviewEligibility.isTransactionReviewable(transaction)) {
+                return response.status(422).json({
+                    status: false,
+                    message: ProductReviewEligibility.getTransactionReviewReason(transaction) || 'Transaksi belum eligible untuk review'
+                })
+            }
+
+            const transactionReference = ProductReviewEligibility.extractTransactionReference(transaction, req)
+            if (!transactionReference.transaction_number && !transactionReference.transaction_id) {
+                return response.status(422).json({
+                    status: false,
+                    message: 'Referensi transaksi tidak tersedia'
+                })
+            }
+
+            const existingReview = await ProductReviewEligibility.findExistingReview({
+                memberId: auth.user.member_id,
+                itemId,
+                transactionId: transactionReference.transaction_id,
+                transactionNumber: transactionReference.transaction_number
+            })
+
+            if (existingReview) {
+                return response.status(409).json({
+                    status: false,
+                    message: 'Produk pada transaksi ini sudah direview'
+                })
+            }
+
+            const comment = req.comment === null || req.comment === undefined
+                ? null
+                : `${req.comment}`.trim()
+            const transactionDetailId = ProductReviewEligibility.extractTransactionDetailId(transactionDetail)
+
+            const review = new ProductReview()
+            review.item_id = itemId
+            review.member_id = auth.user.member_id
+            review.transaction_id = toNullableInteger(transactionReference.transaction_id)
+            review.transaction_number = transactionReference.transaction_number || null
+            review.transaction_detail_id = toNullableInteger(transactionDetailId)
+            review.rating = rating
+            review.comment = comment || null
+
+            await review.save()
+
+            return response.json({
+                status: true,
+                message: 'Review berhasil dikirim',
+                data: {
+                    review: review.toJSON()
                 }
             })
         } catch (error) {

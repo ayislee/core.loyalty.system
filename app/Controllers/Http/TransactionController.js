@@ -3,6 +3,8 @@ const axios = use('axios')
 const Env = use('Env')
 const Transaction = use('App/Models/Transaction')
 const Partner = use('App/Models/Partner')
+const Address = use('App/Models/Address')
+const ProductReviewEligibility = use('App/Helpers/ProductReviewEligibility')
 const qs = use('qs')
 
 class TransactionController {
@@ -13,9 +15,13 @@ class TransactionController {
         try {
             const res = await axios.get(Env.get('MARKETPLACE_CORE')+`transaction/email/${auth.user.email}?${params}`)
             if(res.data.success){
+                const decoratedData = await ProductReviewEligibility.decorateTransactionPayload(
+                    res.data,
+                    auth.user.member_id
+                )
                 return response.json({
                     status: true,
-                    data: res.data
+                    data: decoratedData
                 })
             }else{
                 return response.json(res.data)
@@ -46,6 +52,17 @@ class TransactionController {
             return response.json({
                 status: false,
                 message: 'invalid partner_id'
+            })
+        }
+
+        const memberAddress = await Address.query()
+            .where('member_id', auth.user.member_id)
+            .first()
+
+        if (!memberAddress) {
+            return response.json({
+                status: false,
+                message: 'Lengkapi alamat pengiriman terlebih dahulu'
             })
         }
 
