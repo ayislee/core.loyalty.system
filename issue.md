@@ -1,139 +1,147 @@
-# Issue: History Aktivitas Member dengan IP dan User Agent
+# Issue: Halaman Detail Transaksi Member
 
 ## Ringkasan
-Tambahkan pencatatan history aktivitas member yang menyimpan informasi teknis request seperti alamat IP dan user agent. Data ini dibutuhkan untuk audit sederhana, investigasi masalah login, dan melihat perangkat atau browser yang digunakan member.
+Tambahkan halaman baru di frontend untuk menampilkan detail lengkap transaksi saat member mengklik salah satu transaksi dari daftar transaksi. Saat ini member hanya melihat ringkasan transaksi di list, sehingga informasi detail seperti item, alamat, pembayaran, pengiriman, status, dan total biaya belum mudah dibaca dalam satu halaman khusus.
 
-Fitur ini melibatkan backend sebagai sumber pencatatan data, dan frontend sebagai tempat menampilkan informasi history member jika diperlukan.
+Backend `core.loyalty.system` sudah memiliki endpoint transaksi member. Fitur utama berada di frontend `client.loyalty.system`, tetapi backend perlu dipastikan menyediakan data yang cukup untuk halaman detail.
 
 ## Tujuan
-1. Backend mencatat aktivitas penting member beserta IP address dan user agent.
-2. Data history bisa ditelusuri per member.
-3. Admin atau member dapat melihat daftar history aktivitas sesuai kebutuhan UI yang tersedia.
-4. Pencatatan tidak mengganggu flow utama seperti login, update profile, atau verifikasi kontak.
+1. Member bisa membuka detail transaksi dari daftar transaksi.
+2. Detail transaksi ditampilkan pada halaman baru dengan URL yang jelas.
+3. Halaman detail menampilkan informasi lengkap namun tetap mudah dipahami.
+4. Data detail transaksi hanya bisa dilihat oleh member pemilik transaksi.
+5. Halaman daftar transaksi tetap dapat digunakan seperti sebelumnya.
 
 ## Scope Backend `core.loyalty.system`
-1. Buat struktur penyimpanan history member.
-   - Tambahkan tabel baru, misalnya `member_activity_histories` atau nama lain yang sesuai pola project.
-   - Field minimal yang disarankan:
-     - `id`
-     - `member_id`
-     - `activity_type`
-     - `ip_address`
-     - `user_agent`
-     - `description`
-     - `metadata`
-     - `created_at`
-     - `updated_at`
-   - `metadata` dapat dipakai untuk data tambahan sederhana dalam bentuk JSON/text jika pola database mendukung.
+1. Review endpoint detail transaksi yang sudah ada.
+   - Cek endpoint `GET /api/v1/member/transaction/get`.
+   - Pastikan endpoint memakai auth member.
+   - Pastikan backend tidak mengembalikan transaksi milik member lain.
+   - Pastikan parameter yang dipakai frontend jelas, misalnya `transaction_id`, `transaction_number`, atau identifier lain yang sudah tersedia di list transaksi.
 
-2. Buat model untuk history member.
-   - Tambahkan model baru sesuai standar AdonisJS yang digunakan project.
-   - Pastikan relasi ke member dapat dibuat jika pola model existing mendukung.
+2. Pastikan payload detail cukup untuk frontend.
+   - Informasi transaksi utama:
+     - nomor transaksi
+     - tanggal transaksi
+     - status transaksi
+     - status pembayaran
+     - status pengiriman
+   - Informasi item:
+     - nama produk
+     - gambar produk jika tersedia
+     - quantity
+     - harga satuan
+     - subtotal item
+   - Informasi pembayaran:
+     - metode pembayaran
+     - total pembayaran
+     - biaya tambahan jika ada
+   - Informasi pengiriman:
+     - metode pengiriman
+     - alamat pengiriman
+     - ongkos kirim
+     - nomor resi atau tracking jika tersedia.
 
-3. Buat helper/service pencatatan history.
-   - Buat helper agar pencatatan history tidak tersebar sebagai duplikasi kode.
-   - Helper menerima parameter minimal:
-     - member id
-     - jenis aktivitas
-     - request object
-     - deskripsi opsional
-     - metadata opsional
-   - Helper mengambil IP dari request dengan cara yang konsisten.
-   - Helper mengambil user agent dari header request.
-   - Jika penyimpanan history gagal, jangan sampai membuat proses utama gagal kecuali aktivitas tersebut memang wajib diaudit.
+3. Tambahkan atau rapikan field jika diperlukan.
+   - Jika endpoint detail belum mengembalikan data yang sama dengan list, tambahkan mapping seperlunya.
+   - Jangan mengubah struktur besar endpoint lain jika tidak diperlukan.
+   - Jika data detail berasal dari marketplace core, pastikan error dari upstream diterjemahkan menjadi response yang mudah dipahami frontend.
 
-4. Tentukan aktivitas yang dicatat.
-   - Login berhasil.
-   - Request token login/OTP jika member sudah diketahui.
-   - Update profile member.
-   - Request verifikasi email.
-   - Request verifikasi nomor telepon.
-   - Verifikasi email berhasil.
-   - Verifikasi nomor telepon berhasil.
-   - Logout jika endpoint logout tersedia.
-   - Aktivitas lain bisa ditambahkan nanti tanpa mengubah struktur utama.
-
-5. Buat endpoint membaca history.
-   - Contoh endpoint member: `GET /api/v1/member/activity-history`.
-   - Endpoint wajib menggunakan auth member.
-   - Response berisi daftar history milik member yang sedang login.
-   - Tambahkan pagination atau limit sederhana agar response tidak terlalu besar.
-   - Urutkan dari aktivitas terbaru.
-
-6. Pertimbangkan endpoint admin jika sudah ada area admin.
-   - Jika admin membutuhkan audit member, buat endpoint berdasarkan `member_id`.
-   - Endpoint admin harus memakai middleware/otorisasi admin yang sudah ada.
-   - Jika belum ada kebutuhan admin, cukup siapkan struktur backend agar mudah ditambahkan nanti.
-
-7. Keamanan dan privasi.
-   - Jangan simpan token OTP, password, atau data sensitif lain di `metadata`.
-   - Jangan tampilkan data history member lain ke user biasa.
-   - Jika aplikasi berada di balik proxy/load balancer, pastikan IP yang dicatat menggunakan sumber yang benar sesuai konfigurasi server.
+4. Error handling backend.
+   - Jika transaksi tidak ditemukan, return response error yang jelas.
+   - Jika transaksi bukan milik member yang login, return error dan jangan tampilkan data.
+   - Jika upstream marketplace gagal, return message yang bisa ditampilkan frontend.
 
 ## Scope Frontend `client.loyalty.system`
-1. Tambahkan definisi API baru.
-   - Tambahkan endpoint history member di `src/utils/api.js`.
-   - Gunakan helper API yang sudah tersedia di project.
+1. Tambahkan route halaman detail transaksi.
+   - Contoh route: `/transaction/:transactionId` atau `/transaction/detail/:transactionId`.
+   - Pilih identifier sesuai data yang tersedia dari list transaksi.
+   - Route harus berada di area member yang membutuhkan login.
 
-2. Tampilkan history aktivitas member.
-   - Lokasi yang disarankan adalah halaman Profile atau halaman baru di area member.
-   - Tampilkan informasi utama:
-     - waktu aktivitas
-     - jenis aktivitas
-     - deskripsi
-     - IP address
-     - ringkasan user agent atau perangkat
-   - Jika user agent terlalu panjang, tampilkan ringkasannya dan sediakan detail hanya jika diperlukan.
+2. Update daftar transaksi.
+   - Saat member klik salah satu transaksi, arahkan ke halaman detail.
+   - Klik harus membawa identifier transaksi yang benar.
+   - Jika item list sudah memiliki tombol lain, pastikan klik detail tidak mengganggu aksi tersebut.
 
-3. State dan UX.
-   - Tampilkan loading state saat data diambil.
-   - Tampilkan empty state jika belum ada history.
-   - Tampilkan error message sederhana jika API gagal.
-   - Gunakan pagination/load more jika backend menyediakan pagination.
+3. Buat halaman detail transaksi.
+   - Tampilkan loading state saat mengambil data.
+   - Tampilkan error state jika data gagal diambil.
+   - Tampilkan empty/not found state jika transaksi tidak tersedia.
+   - Tampilkan tombol kembali ke daftar transaksi.
 
-4. Format tampilan.
-   - Gunakan format tanggal yang konsisten dengan halaman lain.
-   - Jangan membuat tampilan terlalu ramai; history harus mudah discan.
-   - Jangan menampilkan metadata mentah yang sulit dibaca user.
+4. Informasi yang perlu ditampilkan.
+   - Header transaksi:
+     - nomor transaksi
+     - tanggal transaksi
+     - status utama
+   - Ringkasan item:
+     - gambar/nama produk
+     - quantity
+     - harga
+     - subtotal
+   - Ringkasan pembayaran:
+     - subtotal belanja
+     - ongkos kirim
+     - diskon jika ada
+     - total pembayaran
+     - metode pembayaran
+   - Ringkasan pengiriman:
+     - alamat tujuan
+     - metode pengiriman
+     - status pengiriman
+     - tracking/resi jika tersedia.
 
-## Alur Data
-1. Member melakukan aktivitas, misalnya login berhasil atau update profile.
-2. Backend mengambil `member_id`, IP address, dan user agent dari request.
-3. Backend menyimpan record history dengan jenis aktivitas yang sesuai.
-4. Frontend memanggil endpoint history member.
-5. Backend mengembalikan daftar history milik member tersebut.
-6. Frontend menampilkan daftar history aktivitas kepada user.
+5. Integrasi API.
+   - Tambahkan atau gunakan endpoint detail transaksi di `src/utils/api.js`.
+   - Gunakan helper `Api` yang sudah ada.
+   - Pastikan parameter request sesuai backend.
+   - Hindari duplikasi mapping yang terlalu rumit; buat helper kecil jika perlu.
+
+6. UX dan tampilan.
+   - Desain mengikuti style halaman member yang sudah ada.
+   - Detail harus mudah discan di mobile.
+   - Gunakan format harga dan tanggal yang konsisten dengan halaman lain.
+   - Jangan menampilkan JSON mentah dari backend.
+
+## Alur User
+1. Member membuka halaman daftar transaksi.
+2. Member memilih salah satu transaksi.
+3. Frontend mengarahkan member ke halaman detail transaksi.
+4. Halaman detail mengambil data transaksi dari backend.
+5. Jika data berhasil diambil, detail transaksi ditampilkan.
+6. Jika gagal, member melihat pesan error dan bisa kembali ke daftar transaksi.
 
 ## Acceptance Criteria
-1. Setiap login berhasil mencatat history dengan `member_id`, IP address, user agent, dan waktu aktivitas.
-2. Aktivitas profile dan verifikasi kontak yang ditentukan ikut tercatat.
-3. Endpoint history hanya mengembalikan data milik member yang sedang login.
-4. Response history diurutkan dari yang terbaru.
-5. Frontend dapat menampilkan daftar history dengan loading, empty, dan error state.
-6. Kegagalan pencatatan history tidak membuat flow utama gagal.
-7. Data sensitif seperti token OTP tidak tersimpan di history.
+1. Member bisa membuka halaman detail dari salah satu transaksi di list.
+2. URL halaman detail transaksi dapat dibuka langsung selama member sudah login.
+3. Halaman detail menampilkan informasi transaksi, item, pembayaran, dan pengiriman.
+4. Halaman detail memiliki loading, error, dan not found state.
+5. Member tidak bisa melihat transaksi milik member lain.
+6. Tombol kembali ke daftar transaksi tersedia.
+7. Format harga dan tanggal konsisten dengan halaman lain.
+8. Halaman daftar transaksi tetap berjalan normal setelah perubahan.
 
 ## Out of Scope
-1. Analisis detail device/browser yang kompleks.
-2. Geolocation berdasarkan IP.
-3. Export history ke file.
-4. Filter lanjutan berdasarkan tanggal atau aktivitas.
-5. Notifikasi keamanan ke email/WhatsApp saat login perangkat baru.
-6. Dashboard audit lengkap untuk admin, kecuali memang sudah ada kebutuhan terpisah.
+1. Edit transaksi dari halaman detail.
+2. Cancel transaksi.
+3. Pembayaran ulang.
+4. Tracking real-time pengiriman.
+5. Cetak invoice atau download PDF.
+6. Perubahan besar struktur transaksi backend.
 
 ## Skenario Test High Level
-1. Login berhasil mencatat history member.
-2. Update profile mencatat history member.
-3. Request dan verifikasi email/nomor telepon mencatat history sesuai aktivitas.
-4. Endpoint history tidak bisa diakses tanpa login.
-5. Member hanya bisa melihat history miliknya sendiri.
-6. History tetap tersimpan walaupun user agent kosong atau IP tidak tersedia.
-7. Frontend menampilkan daftar history, empty state, dan error state.
-8. Flow login/update profile tetap berhasil walaupun pencatatan history mengalami error.
+1. Klik transaksi dari daftar membuka halaman detail yang sesuai.
+2. Membuka halaman detail langsung dari URL dengan transaksi valid.
+3. Membuka halaman detail dengan identifier tidak valid.
+4. Member mencoba membuka transaksi milik member lain.
+5. Detail menampilkan item dan total pembayaran dengan benar.
+6. Detail menampilkan alamat dan informasi pengiriman jika tersedia.
+7. Loading dan error state tampil saat API lambat atau gagal.
+8. Tombol kembali mengarahkan ke daftar transaksi.
 
 ## Definition of Done
-1. Tabel dan model history member tersedia.
-2. Helper/service pencatatan history tersedia dan digunakan pada aktivitas yang disepakati.
-3. Endpoint history member tersedia dan aman.
-4. Frontend memiliki integrasi API dan tampilan history member.
+1. Route detail transaksi frontend tersedia.
+2. Daftar transaksi bisa mengarahkan ke halaman detail.
+3. Halaman detail transaksi mengambil data dari backend dan menampilkannya.
+4. Backend detail transaksi aman untuk transaksi milik member login.
 5. Skenario test high level sudah dicek.

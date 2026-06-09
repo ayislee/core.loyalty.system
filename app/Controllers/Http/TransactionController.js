@@ -7,6 +7,55 @@ const Address = use('App/Models/Address')
 const ProductReviewEligibility = use('App/Helpers/ProductReviewEligibility')
 const qs = use('qs')
 
+const parseJson = (value) => {
+    if (!value) return null
+    if (typeof value === 'object') return value
+
+    try {
+        return JSON.parse(value)
+    } catch (error) {
+        return null
+    }
+}
+
+const toNullableNumber = (value) => {
+    if (value === null || value === undefined || value === '') return null
+
+    const parsed = Number(value)
+    return Number.isFinite(parsed) ? parsed : null
+}
+
+const fillPositiveNumber = (target, source, key) => {
+    const targetValue = toNullableNumber(target?.[key])
+    const sourceValue = toNullableNumber(source?.[key])
+
+    if ((targetValue === null || targetValue <= 0) && sourceValue !== null && sourceValue > 0) {
+        return sourceValue
+    }
+
+    return target?.[key]
+}
+
+const extractLocalTransactionData = (localTransaction) => {
+    const responsePayload = parseJson(localTransaction?.response)
+    return responsePayload?.data || responsePayload || null
+}
+
+const mergeLocalTransactionSnapshot = (transaction, localData) => {
+    if (!transaction || !localData) return transaction
+
+    return {
+        ...localData,
+        ...transaction,
+        transaction_amount: fillPositiveNumber(transaction, localData, 'transaction_amount'),
+        transaction_discount: fillPositiveNumber(transaction, localData, 'transaction_discount'),
+        transaction_shipping_fee: fillPositiveNumber(transaction, localData, 'transaction_shipping_fee'),
+        transaction_total_amount: fillPositiveNumber(transaction, localData, 'transaction_total_amount'),
+        transaction_data: transaction?.transaction_data || localData?.transaction_data,
+        shipping_service_detail: transaction?.shipping_service_detail || localData?.shipping_service_detail
+    }
+}
+
 class TransactionController {
     async list({request, response, auth}){
         const req = request.all()
@@ -37,7 +86,71 @@ class TransactionController {
 
     async get({request, response, auth}){
         const req = request.all()
-        
+        const transactionId = req.transaction_id || req.id
+        const transactionNumber = req.transaction_number || req.transaction_no || req.number
+
+        if (!transactionId && !transactionNumber) {
+            return response.badRequest({
+                status: false,
+                message: 'transaction_id atau transaction_number wajib diisi'
+            })
+        }
+
+        try {
+            let transaction = null
+
+            if (transactionNumber) {
+                transaction = await ProductReviewEligibility.findMemberTransaction({
+                    email: auth.user.email,
+                    transactionNumber
+                })
+            }
+
+            if (!transaction && transactionId) {
+                transaction = await ProductReviewEligibility.findMemberTransaction({
+                    email: auth.user.email,
+                    transactionId
+                })
+            }
+
+            if (!transaction) {
+                return response.status(404).json({
+                    status: false,
+                    message: 'Transaksi tidak ditemukan'
+                })
+            }
+
+            const transactionReference = ProductReviewEligibility.extractTransactionReference(transaction, req)
+            const localLookupValue = transactionReference.transaction_number || transactionNumber
+
+            if (localLookupValue) {
+                const localTransaction = await Transaction.query()
+                    .where('member_id', auth.user.member_id)
+                    .where('response', 'like', `%${localLookupValue}%`)
+                    .orderBy('transaction_id', 'desc')
+                    .first()
+
+                transaction = mergeLocalTransactionSnapshot(
+                    transaction,
+                    extractLocalTransactionData(localTransaction)
+                )
+            }
+
+            const decoratedTransactions = await ProductReviewEligibility.appendReviewEligibilityToTransactions(
+                [transaction],
+                auth.user.member_id
+            )
+
+            return response.json({
+                status: true,
+                data: decoratedTransactions[0] || transaction
+            })
+        } catch (error) {
+            return response.json({
+                status: false,
+                message: error.message
+            })
+        }
     }
 
     async create({request, response, auth}){

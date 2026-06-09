@@ -1,0 +1,13 @@
+{
+	"folders": [
+		{
+			"path": "."
+		},
+		{
+			"path": "../client.loyalty.system"
+		},
+		{
+			"path": "../backend-mediacartz"
+		}
+	]
+}

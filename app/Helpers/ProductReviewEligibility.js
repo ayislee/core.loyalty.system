@@ -224,34 +224,43 @@ const findExistingReview = async ({ memberId, itemId, transactionId, transaction
 }
 
 const buildReviewIndex = (reviews) => {
-  const keys = new Set()
+  const keys = new Map()
   reviews.forEach((review) => {
     const itemId = normalizeIdentifier(review?.item_id)
     const transactionNumber = normalizeIdentifier(review?.transaction_number)
     const transactionId = normalizeIdentifier(review?.transaction_id)
 
     if (itemId && transactionNumber) {
-      keys.add(`${itemId}|number|${transactionNumber}`)
+      keys.set(`${itemId}|number|${transactionNumber}`, review)
     }
 
     if (itemId && transactionId) {
-      keys.add(`${itemId}|id|${transactionId}`)
+      keys.set(`${itemId}|id|${transactionId}`, review)
     }
   })
 
   return keys
 }
 
-const hasReviewForReference = (reviewKeys, itemId, transactionReference) => {
+const getReviewForReference = (reviewKeys, itemId, transactionReference) => {
   const normalizedItemId = normalizeIdentifier(itemId)
   const transactionNumber = normalizeIdentifier(transactionReference?.transaction_number)
   const transactionId = normalizeIdentifier(transactionReference?.transaction_id)
 
-  if (normalizedItemId && transactionNumber && reviewKeys.has(`${normalizedItemId}|number|${transactionNumber}`)) {
-    return true
+  if (normalizedItemId && transactionNumber) {
+    const reviewByNumber = reviewKeys.get(`${normalizedItemId}|number|${transactionNumber}`)
+    if (reviewByNumber) return reviewByNumber
   }
 
-  return Boolean(normalizedItemId && transactionId && reviewKeys.has(`${normalizedItemId}|id|${transactionId}`))
+  if (normalizedItemId && transactionId) {
+    return reviewKeys.get(`${normalizedItemId}|id|${transactionId}`) || null
+  }
+
+  return null
+}
+
+const hasReviewForReference = (reviewKeys, itemId, transactionReference) => {
+  return Boolean(getReviewForReference(reviewKeys, itemId, transactionReference))
 }
 
 const appendReviewEligibilityToTransactions = async (transactions, memberId) => {
@@ -288,7 +297,8 @@ const appendReviewEligibilityToTransactions = async (transactions, memberId) => 
       transaction_detail: detailList.map((detail) => {
         const itemId = extractReviewItemId(detail)
         const transactionDetailId = extractTransactionDetailId(detail)
-        const alreadyReviewed = hasReviewForReference(reviewKeys, itemId, transactionReference)
+        const existingReview = getReviewForReference(reviewKeys, itemId, transactionReference)
+        const alreadyReviewed = Boolean(existingReview)
         const missingItemId = !itemId
         const canReview = Boolean(itemId && transactionCanReview && !alreadyReviewed)
 
@@ -310,6 +320,7 @@ const appendReviewEligibilityToTransactions = async (transactions, memberId) => 
             transaction_detail_id: transactionDetailId || null,
             can_review: canReview,
             already_reviewed: alreadyReviewed,
+            review: existingReview || null,
             reason
           }
         }
