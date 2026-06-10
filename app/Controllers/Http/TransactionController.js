@@ -41,6 +41,71 @@ const extractLocalTransactionData = (localTransaction) => {
     return responsePayload?.data || responsePayload || null
 }
 
+const normalizeText = (value) => `${value || ''}`.trim()
+
+const normalizeEmail = (value) => normalizeText(value).toLowerCase()
+
+const isValidEmail = (value) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(normalizeEmail(value))
+
+const normalizePhone = (value) => {
+    let phone = normalizeText(value).replace(/[\s-]/g, '')
+    if (phone.startsWith('+')) phone = phone.slice(1)
+    if (phone.startsWith('0')) phone = phone.replace(/^0/, '62')
+    return phone
+}
+
+const isValidPhone = (value) => /^62[0-9]{8,14}$/.test(normalizePhone(value))
+
+const resolveMarketplaceTransactionPath = (member) => {
+    const lid = normalizeText(member?.lid)
+    if (isValidEmail(lid)) {
+        return `transaction/email/${encodeURIComponent(normalizeEmail(lid))}`
+    }
+
+    if (isValidPhone(lid)) {
+        return `transaction/msisdn/${encodeURIComponent(normalizePhone(lid))}`
+    }
+
+    const email = normalizeEmail(member?.email)
+    if (isValidEmail(email)) {
+        return `transaction/email/${encodeURIComponent(email)}`
+    }
+
+    const phone = normalizePhone(member?.phone)
+
+    if (isValidPhone(phone)) {
+        return `transaction/msisdn/${encodeURIComponent(phone)}`
+    }
+
+    return null
+}
+
+const getMemberEmailCandidates = (member) => ([
+    member?.lid,
+    member?.email
+])
+    .map((value) => normalizeEmail(value))
+    .filter((value) => isValidEmail(value))
+
+const getMemberPhoneCandidates = (member) => ([
+    member?.lid,
+    member?.phone
+])
+    .map((value) => normalizePhone(value))
+    .filter((value) => isValidPhone(value))
+
+const isTransactionOwnedByMember = (transaction, member) => {
+    const memberEmails = getMemberEmailCandidates(member)
+    const memberPhones = getMemberPhoneCandidates(member)
+    const transactionEmail = normalizeEmail(transaction?.customer_email)
+    const transactionPhone = normalizePhone(transaction?.customer_msisdn)
+
+    return Boolean(
+        (transactionEmail && memberEmails.includes(transactionEmail)) ||
+        (transactionPhone && memberPhones.includes(transactionPhone))
+    )
+}
+
 const mergeLocalTransactionSnapshot = (transaction, localData) => {
     if (!transaction || !localData) return transaction
 
@@ -60,9 +125,18 @@ class TransactionController {
     async list({request, response, auth}){
         const req = request.all()
         const params = qs.stringify(req)
+        const marketplaceTransactionPath = resolveMarketplaceTransactionPath(auth.user)
+
+        if (!marketplaceTransactionPath) {
+            return response.json({
+                status: false,
+                message: 'Email atau nomor telepon member tidak tersedia'
+            })
+        }
+
         // return response.json(params)
         try {
-            const res = await axios.get(Env.get('MARKETPLACE_CORE')+`transaction/email/${auth.user.email}?${params}`)
+            const res = await axios.get(`${Env.get('MARKETPLACE_CORE')}${marketplaceTransactionPath}?${params}`)
             if(res.data.success){
                 const decoratedData = await ProductReviewEligibility.decorateTransactionPayload(
                     res.data,
@@ -100,10 +174,18 @@ class TransactionController {
             let transaction = null
 
             if (transactionNumber) {
-                transaction = await ProductReviewEligibility.findMemberTransaction({
-                    email: auth.user.email,
-                    transactionNumber
-                })
+                const api = `${Env.get('MARKETPLACE_CORE')}transaction/number/${encodeURIComponent(transactionNumber)}`
+                const res = await axios.get(api)
+                const payload = res?.data || {}
+
+                if (!payload.success) {
+                    return response.status(404).json({
+                        status: false,
+                        message: payload.error || payload.message || 'Transaksi tidak ditemukan'
+                    })
+                }
+
+                transaction = payload.data
             }
 
             if (!transaction && transactionId) {
@@ -117,6 +199,13 @@ class TransactionController {
                 return response.status(404).json({
                     status: false,
                     message: 'Transaksi tidak ditemukan'
+                })
+            }
+
+            if (!isTransactionOwnedByMember(transaction, auth.user)) {
+                return response.status(403).json({
+                    status: false,
+                    message: 'Transaksi bukan milik member'
                 })
             }
 
@@ -144,6 +233,57 @@ class TransactionController {
             return response.json({
                 status: true,
                 data: decoratedTransactions[0] || transaction
+            })
+        } catch (error) {
+            return response.json({
+                status: false,
+                message: error.message
+            })
+        }
+    }
+
+    async receiveShipping({request, response, auth}){
+        const req = request.all()
+        const transactionNumber = req.transaction_number || req.transaction_no || req.number
+
+        if (!transactionNumber) {
+            return response.badRequest({
+                status: false,
+                message: 'transaction_number wajib diisi'
+            })
+        }
+
+        try {
+            const transaction = await ProductReviewEligibility.findMemberTransaction({
+                email: auth.user.email,
+                transactionNumber
+            })
+
+            if (!transaction) {
+                return response.status(404).json({
+                    status: false,
+                    message: 'Transaksi tidak ditemukan'
+                })
+            }
+
+            const transactionReference = ProductReviewEligibility.extractTransactionReference(transaction, req)
+            const targetTransactionNumber = transactionReference.transaction_number || transactionNumber
+            const api = `${Env.get('MARKETPLACE_CORE')}transaction/number/${encodeURIComponent(targetTransactionNumber)}/shipping/receive`
+            const res = await axios.put(api, {})
+            const payload = res?.data || {}
+
+            if (payload.success) {
+                return response.json({
+                    status: true,
+                    message: payload.success,
+                    data: payload.data
+                })
+            }
+
+            return response.json({
+                status: false,
+                message: payload.error || payload.message || 'Gagal memperbarui status pengiriman',
+                data: payload.data || null
             })
         } catch (error) {
             return response.json({

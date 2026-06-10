@@ -1,147 +1,135 @@
-# Issue: Halaman Detail Transaksi Member
+# Issue: Fleksibilitas List Transaksi Member Berdasarkan Email atau Nomor Telepon
 
 ## Ringkasan
-Tambahkan halaman baru di frontend untuk menampilkan detail lengkap transaksi saat member mengklik salah satu transaksi dari daftar transaksi. Saat ini member hanya melihat ringkasan transaksi di list, sehingga informasi detail seperti item, alamat, pembayaran, pengiriman, status, dan total biaya belum mudah dibaca dalam satu halaman khusus.
+Halaman frontend `/transaction/list` saat ini memanggil endpoint backend `core.loyalty.system`:
 
-Backend `core.loyalty.system` sudah memiliki endpoint transaksi member. Fitur utama berada di frontend `client.loyalty.system`, tetapi backend perlu dipastikan menyediakan data yang cukup untuk halaman detail.
+```http
+GET /api/v1/member/transaction
+```
+
+Di backend, request tersebut diteruskan ke `MARKETPLACE_CORE` menggunakan email member:
+
+```http
+GET {MARKETPLACE_CORE}/transaction/email/{email_member}?page=1&rows=10&order_by=transaction_created_datetime&sort_by=desc
+```
+
+Masalahnya, member dapat login menggunakan email atau nomor telepon berdasarkan field `members.lid` di database `loyalty.system`. Jika member login menggunakan nomor telepon dan belum memiliki email, list transaksi tidak bisa ditemukan karena backend tetap mencari transaksi berdasarkan email.
+
+## Informasi Project
+1. `core.loyalty.system` adalah backend loyalty.
+2. `client.loyalty.system` adalah frontend.
+3. `backend-mediacartz` adalah service `MARKETPLACE_CORE` yang dikonfigurasi pada `.env` di `core.loyalty.system`.
 
 ## Tujuan
-1. Member bisa membuka detail transaksi dari daftar transaksi.
-2. Detail transaksi ditampilkan pada halaman baru dengan URL yang jelas.
-3. Halaman detail menampilkan informasi lengkap namun tetap mudah dipahami.
-4. Data detail transaksi hanya bisa dilihat oleh member pemilik transaksi.
-5. Halaman daftar transaksi tetap dapat digunakan seperti sebelumnya.
+1. Endpoint `GET /api/v1/member/transaction` tetap dipakai frontend tanpa perubahan URL.
+2. Backend `core.loyalty.system` menentukan cara lookup transaksi berdasarkan identitas login member.
+3. Jika member memiliki email valid, backend dapat menggunakan endpoint marketplace berbasis email.
+4. Jika member tidak memiliki email tetapi memiliki nomor telepon, backend menggunakan endpoint marketplace berbasis msisdn.
+5. Member yang login menggunakan nomor telepon tetap bisa melihat transaksi miliknya di `/transaction/list`.
+
+## Endpoint Marketplace Yang Tersedia
+Di `backend-mediacartz`, endpoint yang relevan:
+
+```http
+GET {MARKETPLACE_CORE}/transaction/email/{email_member}
+GET {MARKETPLACE_CORE}/transaction/msisdn/{nomor_telepon}
+```
+
+Keduanya mengarah ke controller yang sama:
+
+```js
+TransactionController.getIndex
+```
 
 ## Scope Backend `core.loyalty.system`
-1. Review endpoint detail transaksi yang sudah ada.
-   - Cek endpoint `GET /api/v1/member/transaction/get`.
-   - Pastikan endpoint memakai auth member.
-   - Pastikan backend tidak mengembalikan transaksi milik member lain.
-   - Pastikan parameter yang dipakai frontend jelas, misalnya `transaction_id`, `transaction_number`, atau identifier lain yang sudah tersedia di list transaksi.
+1. Update logic pada `TransactionController.list`.
+2. Jangan mengubah kontrak frontend untuk endpoint `member/transaction`.
+3. Tentukan identifier transaksi dari data member login:
+   - Prioritas email jika `auth.user.email` tersedia dan valid.
+   - Fallback ke nomor telepon jika email kosong/tidak tersedia.
+4. Saat memakai nomor telepon, panggil:
 
-2. Pastikan payload detail cukup untuk frontend.
-   - Informasi transaksi utama:
-     - nomor transaksi
-     - tanggal transaksi
-     - status transaksi
-     - status pembayaran
-     - status pengiriman
-   - Informasi item:
-     - nama produk
-     - gambar produk jika tersedia
-     - quantity
-     - harga satuan
-     - subtotal item
-   - Informasi pembayaran:
-     - metode pembayaran
-     - total pembayaran
-     - biaya tambahan jika ada
-   - Informasi pengiriman:
-     - metode pengiriman
-     - alamat pengiriman
-     - ongkos kirim
-     - nomor resi atau tracking jika tersedia.
+```http
+GET {MARKETPLACE_CORE}/transaction/msisdn/{nomor_telepon}
+```
 
-3. Tambahkan atau rapikan field jika diperlukan.
-   - Jika endpoint detail belum mengembalikan data yang sama dengan list, tambahkan mapping seperlunya.
-   - Jangan mengubah struktur besar endpoint lain jika tidak diperlukan.
-   - Jika data detail berasal dari marketplace core, pastikan error dari upstream diterjemahkan menjadi response yang mudah dipahami frontend.
+5. Tetap teruskan query pagination dan sorting yang dikirim frontend:
 
-4. Error handling backend.
-   - Jika transaksi tidak ditemukan, return response error yang jelas.
-   - Jika transaksi bukan milik member yang login, return error dan jangan tampilkan data.
-   - Jika upstream marketplace gagal, return message yang bisa ditampilkan frontend.
+```js
+page
+rows
+order_by
+sort_by
+```
+
+6. Pastikan response ke frontend tetap menggunakan format yang sekarang:
+
+```js
+{
+  status: true,
+  data: ...
+}
+```
+
+7. Jika email dan nomor telepon sama-sama tidak tersedia, return error yang jelas, misalnya:
+
+```js
+{
+  status: false,
+  message: "Email atau nomor telepon member tidak tersedia"
+}
+```
 
 ## Scope Frontend `client.loyalty.system`
-1. Tambahkan route halaman detail transaksi.
-   - Contoh route: `/transaction/:transactionId` atau `/transaction/detail/:transactionId`.
-   - Pilih identifier sesuai data yang tersedia dari list transaksi.
-   - Route harus berada di area member yang membutuhkan login.
+1. Tidak perlu mengganti endpoint `/transaction/list`.
+2. Tidak perlu mengganti API constant `TRANSACTION_LIST`, kecuali ada kebutuhan teknis saat implementasi.
+3. Jika backend mengembalikan error karena identitas member tidak lengkap, tampilkan pesan error yang sudah tersedia dari response backend.
 
-2. Update daftar transaksi.
-   - Saat member klik salah satu transaksi, arahkan ke halaman detail.
-   - Klik harus membawa identifier transaksi yang benar.
-   - Jika item list sudah memiliki tombol lain, pastikan klik detail tidak mengganggu aksi tersebut.
+## Scope `backend-mediacartz`
+1. Pastikan endpoint berikut masih tersedia dan berjalan:
 
-3. Buat halaman detail transaksi.
-   - Tampilkan loading state saat mengambil data.
-   - Tampilkan error state jika data gagal diambil.
-   - Tampilkan empty/not found state jika transaksi tidak tersedia.
-   - Tampilkan tombol kembali ke daftar transaksi.
+```http
+GET /api/v1/transaction/email/:customer_email
+GET /api/v1/transaction/msisdn/:customer_msisdn
+```
 
-4. Informasi yang perlu ditampilkan.
-   - Header transaksi:
-     - nomor transaksi
-     - tanggal transaksi
-     - status utama
-   - Ringkasan item:
-     - gambar/nama produk
-     - quantity
-     - harga
-     - subtotal
-   - Ringkasan pembayaran:
-     - subtotal belanja
-     - ongkos kirim
-     - diskon jika ada
-     - total pembayaran
-     - metode pembayaran
-   - Ringkasan pengiriman:
-     - alamat tujuan
-     - metode pengiriman
-     - status pengiriman
-     - tracking/resi jika tersedia.
+2. Tidak perlu membuat endpoint baru jika endpoint msisdn sudah berjalan normal.
+3. Perubahan di `backend-mediacartz` hanya dilakukan jika ditemukan bug pada endpoint `transaction/msisdn`.
 
-5. Integrasi API.
-   - Tambahkan atau gunakan endpoint detail transaksi di `src/utils/api.js`.
-   - Gunakan helper `Api` yang sudah ada.
-   - Pastikan parameter request sesuai backend.
-   - Hindari duplikasi mapping yang terlalu rumit; buat helper kecil jika perlu.
-
-6. UX dan tampilan.
-   - Desain mengikuti style halaman member yang sudah ada.
-   - Detail harus mudah discan di mobile.
-   - Gunakan format harga dan tanggal yang konsisten dengan halaman lain.
-   - Jangan menampilkan JSON mentah dari backend.
-
-## Alur User
-1. Member membuka halaman daftar transaksi.
-2. Member memilih salah satu transaksi.
-3. Frontend mengarahkan member ke halaman detail transaksi.
-4. Halaman detail mengambil data transaksi dari backend.
-5. Jika data berhasil diambil, detail transaksi ditampilkan.
-6. Jika gagal, member melihat pesan error dan bisa kembali ke daftar transaksi.
+## Alur Yang Diharapkan
+1. Member membuka `/transaction/list`.
+2. Frontend memanggil `GET /api/v1/member/transaction`.
+3. Backend `core.loyalty.system` membaca data member login.
+4. Jika email tersedia, backend memanggil marketplace via endpoint email.
+5. Jika email tidak tersedia dan nomor telepon tersedia, backend memanggil marketplace via endpoint msisdn.
+6. Marketplace mengembalikan list transaksi.
+7. Backend mengembalikan response ke frontend dengan format yang sama seperti sebelumnya.
 
 ## Acceptance Criteria
-1. Member bisa membuka halaman detail dari salah satu transaksi di list.
-2. URL halaman detail transaksi dapat dibuka langsung selama member sudah login.
-3. Halaman detail menampilkan informasi transaksi, item, pembayaran, dan pengiriman.
-4. Halaman detail memiliki loading, error, dan not found state.
-5. Member tidak bisa melihat transaksi milik member lain.
-6. Tombol kembali ke daftar transaksi tersedia.
-7. Format harga dan tanggal konsisten dengan halaman lain.
-8. Halaman daftar transaksi tetap berjalan normal setelah perubahan.
-
-## Out of Scope
-1. Edit transaksi dari halaman detail.
-2. Cancel transaksi.
-3. Pembayaran ulang.
-4. Tracking real-time pengiriman.
-5. Cetak invoice atau download PDF.
-6. Perubahan besar struktur transaksi backend.
+1. Member yang memiliki email tetap bisa melihat list transaksi.
+2. Member yang tidak memiliki email tetapi memiliki nomor telepon tetap bisa melihat list transaksi.
+3. Frontend `/transaction/list` tidak perlu mengganti endpoint.
+4. Pagination dan sorting tetap berjalan seperti sebelumnya.
+5. Response frontend tidak berubah secara struktur.
+6. Jika email dan nomor telepon tidak tersedia, frontend menerima pesan error yang jelas.
 
 ## Skenario Test High Level
-1. Klik transaksi dari daftar membuka halaman detail yang sesuai.
-2. Membuka halaman detail langsung dari URL dengan transaksi valid.
-3. Membuka halaman detail dengan identifier tidak valid.
-4. Member mencoba membuka transaksi milik member lain.
-5. Detail menampilkan item dan total pembayaran dengan benar.
-6. Detail menampilkan alamat dan informasi pengiriman jika tersedia.
-7. Loading dan error state tampil saat API lambat atau gagal.
-8. Tombol kembali mengarahkan ke daftar transaksi.
+1. Login sebagai member yang memiliki email, lalu buka `/transaction/list`.
+2. Login sebagai member yang tidak memiliki email tetapi memiliki nomor telepon, lalu buka `/transaction/list`.
+3. Login sebagai member yang memiliki email dan nomor telepon, pastikan lookup tetap berhasil.
+4. Test pagination pada member email dan member nomor telepon.
+5. Test kondisi member tanpa email dan tanpa nomor telepon.
+6. Test ketika `MARKETPLACE_CORE` mengembalikan error.
+
+## Out of Scope
+1. Redesign halaman `/transaction/list`.
+2. Perubahan struktur response besar dari backend ke frontend.
+3. Pembuatan endpoint marketplace baru.
+4. Perubahan flow login member.
+5. Perubahan data transaksi di database marketplace.
 
 ## Definition of Done
-1. Route detail transaksi frontend tersedia.
-2. Daftar transaksi bisa mengarahkan ke halaman detail.
-3. Halaman detail transaksi mengambil data dari backend dan menampilkannya.
-4. Backend detail transaksi aman untuk transaksi milik member login.
-5. Skenario test high level sudah dicek.
+1. `GET /api/v1/member/transaction` bisa lookup transaksi lewat email atau nomor telepon.
+2. Frontend `/transaction/list` tetap berjalan tanpa perubahan endpoint.
+3. Skenario test high level sudah dicek.
+4. Tidak ada regresi pada member yang sudah memiliki email.
