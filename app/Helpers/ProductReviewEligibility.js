@@ -5,29 +5,10 @@ const Env = use('Env')
 const ProductReview = use('App/Models/ProductReview')
 const qs = use('qs')
 
-// Status eligible review: transaksi dibayar/approved dan pengiriman sudah final.
+// Status eligible review: transaksi sudah selesai.
 const FINAL_APPROVAL_STATUSES = [
-  'approved',
-  'success',
   'completed',
-  'complete',
-  'paid',
-  'settlement',
-  'settled'
-]
-
-const FINAL_SHIPPING_STATUSES = [
-  'received',
-  'delivered',
-  'completed',
-  'complete',
-  'finished',
-  'done',
-  'success',
-  'diterima',
-  'selesai',
-  'sampai',
-  'terkirim'
+  'complete'
 ]
 
 const normalizeStatus = (value) => `${value || ''}`
@@ -181,21 +162,13 @@ const isApprovalFinal = (transaction) => (
   hasFinalStatus(approvalStatusCandidates(transaction), FINAL_APPROVAL_STATUSES)
 )
 
-const isShippingFinal = (transaction) => (
-  hasFinalStatus(shippingStatusCandidates(transaction), FINAL_SHIPPING_STATUSES)
-)
-
 const isTransactionReviewable = (transaction) => (
-  isApprovalFinal(transaction) && isShippingFinal(transaction)
+  isApprovalFinal(transaction)
 )
 
 const getTransactionReviewReason = (transaction) => {
   if (!isApprovalFinal(transaction)) {
-    return 'Pembayaran transaksi belum selesai'
-  }
-
-  if (!isShippingFinal(transaction)) {
-    return 'Barang belum diterima'
+    return 'Transaksi belum selesai'
   }
 
   return null

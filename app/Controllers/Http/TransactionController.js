@@ -254,15 +254,21 @@ class TransactionController {
         }
 
         try {
-            const transaction = await ProductReviewEligibility.findMemberTransaction({
-                email: auth.user.email,
-                transactionNumber
-            })
+            const transactionRes = await axios.get(`${Env.get('MARKETPLACE_CORE')}transaction/number/${encodeURIComponent(transactionNumber)}`)
+            const transactionPayload = transactionRes?.data || {}
+            const transaction = transactionPayload.data
 
-            if (!transaction) {
+            if (!transactionPayload.success || !transaction) {
                 return response.status(404).json({
                     status: false,
-                    message: 'Transaksi tidak ditemukan'
+                    message: transactionPayload.error || transactionPayload.message || 'Transaksi tidak ditemukan'
+                })
+            }
+
+            if (!isTransactionOwnedByMember(transaction, auth.user)) {
+                return response.status(403).json({
+                    status: false,
+                    message: 'Transaksi bukan milik member'
                 })
             }
 
@@ -293,8 +299,128 @@ class TransactionController {
         }
     }
 
+    async complete({request, response, auth}){
+        const req = request.all()
+        const transactionNumber = req.transaction_number || req.transaction_no || req.number
+
+        if (!transactionNumber) {
+            return response.badRequest({
+                status: false,
+                message: 'transaction_number wajib diisi'
+            })
+        }
+
+        try {
+            const transactionRes = await axios.get(`${Env.get('MARKETPLACE_CORE')}transaction/number/${encodeURIComponent(transactionNumber)}`)
+            const transactionPayload = transactionRes?.data || {}
+            const transaction = transactionPayload.data
+
+            if (!transactionPayload.success || !transaction) {
+                return response.status(404).json({
+                    status: false,
+                    message: transactionPayload.error || transactionPayload.message || 'Transaksi tidak ditemukan'
+                })
+            }
+
+            if (!isTransactionOwnedByMember(transaction, auth.user)) {
+                return response.status(403).json({
+                    status: false,
+                    message: 'Transaksi bukan milik member'
+                })
+            }
+
+            const transactionReference = ProductReviewEligibility.extractTransactionReference(transaction, req)
+            const targetTransactionNumber = transactionReference.transaction_number || transactionNumber
+            const api = `${Env.get('MARKETPLACE_CORE')}transaction/number/${encodeURIComponent(targetTransactionNumber)}/complete`
+            const res = await axios.put(api, {})
+            const payload = res?.data || {}
+
+            if (payload.success) {
+                const decoratedTransactions = await ProductReviewEligibility.appendReviewEligibilityToTransactions(
+                    [payload.data],
+                    auth.user.member_id
+                )
+
+                return response.json({
+                    status: true,
+                    message: payload.success,
+                    data: decoratedTransactions[0] || payload.data
+                })
+            }
+
+            return response.json({
+                status: false,
+                message: payload.error || payload.message || 'Gagal menyelesaikan transaksi',
+                data: payload.data || null
+            })
+        } catch (error) {
+            return response.json({
+                status: false,
+                message: error.message
+            })
+        }
+    }
+
+    async complain({request, response, auth}){
+        const req = request.all()
+        const transactionNumber = req.transaction_number || req.transaction_no || req.number
+
+        if (!transactionNumber) {
+            return response.badRequest({
+                status: false,
+                message: 'transaction_number wajib diisi'
+            })
+        }
+
+        try {
+            const transaction = await ProductReviewEligibility.findMemberTransaction({
+                email: auth.user.email,
+                transactionNumber
+            })
+
+            if (!transaction) {
+                return response.status(404).json({
+                    status: false,
+                    message: 'Transaksi tidak ditemukan'
+                })
+            }
+
+            const transactionReference = ProductReviewEligibility.extractTransactionReference(transaction, req)
+            const targetTransactionNumber = transactionReference.transaction_number || transactionNumber
+            const api = `${Env.get('MARKETPLACE_CORE')}transaction/number/${encodeURIComponent(targetTransactionNumber)}/complain`
+            const res = await axios.put(api, {
+                complain_note: req.complain_note || null
+            })
+            const payload = res?.data || {}
+
+            if (payload.success) {
+                return response.json({
+                    status: true,
+                    message: payload.success,
+                    data: payload.data
+                })
+            }
+
+            return response.json({
+                status: false,
+                message: payload.error || payload.message || 'Gagal mengirim complain transaksi',
+                data: payload.data || null
+            })
+        } catch (error) {
+            return response.json({
+                status: false,
+                message: error.message
+            })
+        }
+    }
+
     async create({request, response, auth}){
         const req = request.all()
+        const normalizeDeliveryNote = (value) => {
+            const normalized = `${value || ''}`.trim()
+            return normalized ? normalized.slice(0, 255) : null
+        }
+        const transactionDeliveryNote = normalizeDeliveryNote(req.transaction_delivery_note)
         let cashier_id
         const partner = await Partner.query().where('partner_id',auth.user.default_partner_id).first()
         const marketplaceCore = Env.get('MARKETPLACE_CORE')
@@ -400,6 +526,9 @@ class TransactionController {
                 shipping_service: req.shipping_service,
                 pickup_date: req.pickup_date,
                 transaction_url_referer: Env.get('APP_URL')
+            }
+            if(transactionDeliveryNote){
+                params.transaction_delivery_note = transactionDeliveryNote
             }
             if(req.voucher_code){
                 params.voucher_type = "loyalty"
