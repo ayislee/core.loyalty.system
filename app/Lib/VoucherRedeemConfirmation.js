@@ -11,6 +11,7 @@ const Voucher = use('App/Models/Voucher')
 const Point = use('App/Models/Point')
 const PointHistory = use('App/Models/PointHistory')
 const MemberVoucher = use('App/Models/MemberVoucher')
+const VoucherSnapshot = use('App/Helpers/VoucherSnapshot')
 const WhatsappAPI = use('App/Lib/WhatsappAPI')
 const BasicEmailService = use('App/Lib/BasicEmailService')
 
@@ -275,7 +276,7 @@ class VoucherRedeemConfirmationService {
             memberVoucher.voucher_id = confirmation.voucher_id
             memberVoucher.voucher_code = uuid.v4()
             memberVoucher.expire_date = moment().add(voucher.duration, 'days').format('YYYY-MM-DD HH:mm:ss')
-            memberVoucher.amount = parseFloat(Env.get('POINT') ? Env.get('POINT') : 1000) * parseFloat(voucher.number_point)
+            VoucherSnapshot.applyToMemberVoucher(memberVoucher, voucher)
             await memberVoucher.save()
 
             confirmation.status = 'confirmed'

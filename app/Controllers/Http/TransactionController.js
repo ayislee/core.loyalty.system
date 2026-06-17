@@ -4,8 +4,11 @@ const Env = use('Env')
 const Transaction = use('App/Models/Transaction')
 const Partner = use('App/Models/Partner')
 const Address = use('App/Models/Address')
+const MemberVoucher = use('App/Models/MemberVoucher')
 const ProductReviewEligibility = use('App/Helpers/ProductReviewEligibility')
 const qs = use('qs')
+const moment = use('moment')
+const CryptoJS = require('crypto-js')
 
 const parseJson = (value) => {
     if (!value) return null
@@ -42,6 +45,8 @@ const extractLocalTransactionData = (localTransaction) => {
 }
 
 const normalizeText = (value) => `${value || ''}`.trim()
+
+const normalizeCompanySlug = (value) => normalizeText(value).toLowerCase()
 
 const normalizeEmail = (value) => normalizeText(value).toLowerCase()
 
@@ -122,6 +127,78 @@ const mergeLocalTransactionSnapshot = (transaction, localData) => {
 }
 
 class TransactionController {
+    async validateVoucherCompany({ voucherCode, checkoutCompanySlug, memberId }) {
+        if (!voucherCode) {
+            return { status: true }
+        }
+
+        const normalizedCompanySlug = normalizeCompanySlug(checkoutCompanySlug)
+        if (!normalizedCompanySlug) {
+            return {
+                status: false,
+                message: 'company_slug is required'
+            }
+        }
+
+        const partner = await Partner.query()
+            .where('company_slug', normalizedCompanySlug)
+            .first()
+
+        if (!partner || !partner.server_id) {
+            return {
+                status: false,
+                message: 'voucher not available for this company'
+            }
+        }
+
+        try {
+            const bytes = CryptoJS.AES.decrypt(voucherCode, partner.server_id)
+            const memberVoucherId = bytes.toString(CryptoJS.enc.Utf8)
+
+            if (!memberVoucherId) {
+                return {
+                    status: false,
+                    message: 'voucher not available for this company'
+                }
+            }
+
+            const memberVoucher = await MemberVoucher.query()
+                .where('member_voucher_id', memberVoucherId)
+                .where('member_id', memberId)
+                .where('used', '0')
+                .where('expire_date', '>=', moment().format('YYYY-MM-DD HH:mm:ss'))
+                .with('voucher')
+                .first()
+
+            if (!memberVoucher) {
+                return {
+                    status: false,
+                    message: 'invalid voucher'
+                }
+            }
+
+            const memberVoucherJson = memberVoucher.toJSON()
+            const voucherCompanySlug = normalizeCompanySlug(memberVoucherJson?.voucher?.partner?.company_slug)
+
+            if (!voucherCompanySlug || voucherCompanySlug !== normalizedCompanySlug) {
+                return {
+                    status: false,
+                    message: 'voucher not available for this company'
+                }
+            }
+
+            return {
+                status: true,
+                member_voucher_id: memberVoucherId
+            }
+        } catch (error) {
+            return {
+                status: false,
+                message: 'voucher not available for this company'
+            }
+        }
+    }
+
     async list({request, response, auth}){
         const req = request.all()
         const params = qs.stringify(req)
@@ -470,17 +547,31 @@ class TransactionController {
         const storeSlug = req.store_slug || partner.store_slug
         const companySlugFromStore = await resolveCompanySlugFromStore(storeSlug)
 
+        const checkoutCompanySlug = companySlugFromStore || req.company_slug || defaultCompanySlug || partner.company_slug
         const companySlugs = [...new Set([
+            checkoutCompanySlug,
             req.company_slug,
-            partner.company_slug,
             defaultCompanySlug,
-            companySlugFromStore
+            partner.company_slug
         ].filter(Boolean))]
 
         if (companySlugs.length === 0) {
             return response.json({
                 status: false,
                 message: 'company_slug is required'
+            })
+        }
+
+        const voucherValidation = await this.validateVoucherCompany({
+            voucherCode: req.voucher_code,
+            checkoutCompanySlug,
+            memberId: auth.user.member_id
+        })
+
+        if (!voucherValidation.status) {
+            return response.json({
+                status: false,
+                message: voucherValidation.message
             })
         }
 
@@ -511,6 +602,8 @@ class TransactionController {
             const params = {
                 item: req.item,
                 store_id: req.store_id,
+                store_slug: storeSlug,
+                company_slug: checkoutCompanySlug,
                 voucher_code: req.voucher_code,
                 ms_payment_id: Env.get('MARKETPLACE_CORE_PAYMENT_ID') || Env.get('MS_PAYMENT_ID') || 4,
                 ms_delivery_id: req.ms_delivery_id,

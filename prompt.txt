@@ -6,17 +6,7 @@ informasi umum:
 4. backend-mediacartz = backend marketplace / MARKETPLACE_CORE
 5. frontend-mediacartz = frontend marketplace untuk backend-mediacartz
 
-latar belakang:
-- saat ini pada saat transaksi yang menggunakan metoda pembayaran menggunakan MIDRANS / online, status transaksi secara otomatis akan approve saat pembayaran berhasil diterima, tetapi apabila metoda pengiriman pengiriman menggunakan kurir, transaksi belum dianggap selesai, sedangkan apabila transaksi di approve, secara otomatin memberikan point loyalty.
-pada kondisi ini apabila terjadi pengiriman kurir gagal maka secara otomatis transaksi menjadi gagal. sedangkan point sudah dikirim, maka akan terjadi bug pada pemberian point. 
-- belum ada fitur yang mengkonfirmasi barang sudah berhasil diterima konsumen, satu-satunya informasi yang menunjukan barang telah sampai ke konsumen adalah dari webhook gosend, tetapi informasi itu perlu di konfirmasi juga oleh konsumen bahwa barang nya benar-benar telah diterima 
 
 planing nya adalah:
-1. untuk pembayaran melalui online (MIDRANS) dan menggunkan kurir, saat berhasil melakukan pembayaran, statusnya ubah menjadi `verified`, langkah selanjutnya ubah lagi menjadi `progressing` dan jangan lupa catat di history transaksi (table transaction_status). status `processing` ini adalah menandakan bahwa sedang dalam proses pengiriman
-2. buatkan fitur konfirmasi barang telah diterima dari kurir dengan menambahkan tombol `selesai` dan tombol `complain` di halaman /transaction/detail/e90691bd-0c60-4c45-9d58-f488ebdb15ac pada frontend 
-3. apabila menekan tombol `selesai` maka status transaksi berubah menjadi `complete` dan selanjutnya point di berikan
-4. apabila menekan tombol `complain` maka awahkan ke whataps toko dengan pesan pertama menyertakan transaction_number
-5. apabila konsumen tidak menekan tombol selesai atau complain dalam waktu 24jam, maka secara otomatis status berubah menjadi complete dan poin di berikan
-
-
+1. pada client.royalty.system, halaman di /order, voucher hanya bisa di klaim pada company yan mengeluarkan voucher  
 jangan buatkan terlalu detain instruksi unit test nya. buatkan saja skenario apa yang harus di test, biarkan yang mengimplementasi detail skenarionya adalah junior programer atau model ai yang lebih murah

@@ -7,6 +7,7 @@ const PointHistory = use('App/Models/PointHistory')
 const Point = use('App/Models/Point')
 const Partner = use('App/Models/Partner')
 const MemberVoucher = use('App/Models/MemberVoucher')
+const VoucherSnapshot = use('App/Helpers/VoucherSnapshot')
 const Database = use('Database')
 const uuid = use('uuid')
 const moment = use('moment')
@@ -140,7 +141,7 @@ Event.on('redeem::member', async (data) => {
         mVoucher.voucher_id = data.voucher.voucher_id
         mVoucher.voucher_code = uuid.v4()
         mVoucher.expire_date = moment().add(data.voucher.duration,'days').format('YYYY-MM-DD HH:mm:ss')
-        mVoucher.amount = parseFloat(Env.get('POINT')?Env.get('POINT'):1000) * data.voucher.number_point
+        VoucherSnapshot.applyToMemberVoucher(mVoucher, data.voucher)
         await mVoucher.save(trx)
         await trx.commit()
         console.log('success')

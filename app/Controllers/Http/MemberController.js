@@ -316,7 +316,9 @@ class MemberController {
             const mv = await MemberVoucher.query()
             .where('member_voucher_id',originalText).where('used','0')
             .where('expire_date','>=',now)
-            .with('voucher')
+            .with('voucher', (voucher) => {
+                voucher.with('partner')
+            })
             .with('member')
             .first()
             return response.json({
@@ -341,7 +343,9 @@ class MemberController {
         .where('member_id',auth.user.member_id)
         .with('point')
         .with('member_voucher',(build)=>{
-            build.with('voucher').where('member_vouchers.used','0')
+            build.with('voucher', (voucher) => {
+                voucher.with('partner')
+            }).where('member_vouchers.used','0')
             .where('expire_date','>',moment().format('YYYY-MM-DD HH:mm:ss'))
         })
         .first()
@@ -994,7 +998,9 @@ class MemberController {
 
     async redeem_voucher({request, response, auth}) {
         const data = await MemberVoucher.query()
-        .with('voucher')
+        .with('voucher', (voucher) => {
+            voucher.with('partner')
+        })
         .with('member')
         .where('member_id', auth.user.member_id)
         .where('expire_date','>',moment().format('YYYY-MM-DD HH:mm:ss'))
@@ -1114,7 +1120,9 @@ class MemberController {
 
     async member_vouchers({request, response, auth}) {
         const data = await MemberVoucher.query()
-        .with('voucher')
+        .with('voucher', (voucher) => {
+            voucher.with('partner')
+        })
         .with('member')
         .where('member_id', request.all().member_id)
         // .where('expire_date','>',moment().format('YYYY-MM-DD HH:mm:ss'))

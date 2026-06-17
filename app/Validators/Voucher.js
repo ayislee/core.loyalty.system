@@ -10,7 +10,7 @@ class Voucher {
             status: "required|in:active,not active",
 			description: "required",
             duration: "required|number",
-			type: "required|in:free,amount"
+			type: "required|in:free,amount,free_delivery"
 		}
 	}
 
