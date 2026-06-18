@@ -48,6 +48,8 @@ const normalizeText = (value) => `${value || ''}`.trim()
 
 const normalizeCompanySlug = (value) => normalizeText(value).toLowerCase()
 
+const normalizeSku = (value) => normalizeText(value).toLowerCase()
+
 const normalizeEmail = (value) => normalizeText(value).toLowerCase()
 
 const isValidEmail = (value) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(normalizeEmail(value))
@@ -127,7 +129,31 @@ const mergeLocalTransactionSnapshot = (transaction, localData) => {
 }
 
 class TransactionController {
-    async validateVoucherCompany({ voucherCode, checkoutCompanySlug, memberId }) {
+    voucherMatchesItems(memberVoucher, items = []) {
+        const memberVoucherJson = memberVoucher?.toJSON ? memberVoucher.toJSON() : memberVoucher
+        const voucherSku = normalizeSku(memberVoucherJson?.voucher?.sku || memberVoucherJson?.sku)
+        if (!voucherSku) {
+            return true
+        }
+
+        const itemSkus = (items || [])
+            .flatMap((item) => [
+                item?.item_sku,
+                item?.sku,
+                item?.product_sku,
+                item?.menu_sku
+            ])
+            .map(normalizeSku)
+            .filter(Boolean)
+
+        if (itemSkus.length === 0) {
+            return true
+        }
+
+        return itemSkus.includes(voucherSku)
+    }
+
+    async validateVoucherCompany({ voucherCode, checkoutCompanySlug, memberId, items = [] }) {
         if (!voucherCode) {
             return { status: true }
         }
@@ -184,6 +210,13 @@ class TransactionController {
                 return {
                     status: false,
                     message: 'voucher not available for this company'
+                }
+            }
+
+            if (!this.voucherMatchesItems(memberVoucherJson, items)) {
+                return {
+                    status: false,
+                    message: 'voucher not match to any item'
                 }
             }
 
@@ -565,7 +598,8 @@ class TransactionController {
         const voucherValidation = await this.validateVoucherCompany({
             voucherCode: req.voucher_code,
             checkoutCompanySlug,
-            memberId: auth.user.member_id
+            memberId: auth.user.member_id,
+            items: req.item || []
         })
 
         if (!voucherValidation.status) {

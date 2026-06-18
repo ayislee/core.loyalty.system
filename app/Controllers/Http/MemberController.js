@@ -1022,28 +1022,31 @@ class MemberController {
         .first()
 
         if(!member_voucher){
+            await trx.rollback()
             return response.json({
                 status: true,
                 message: 'invalid voucher'
             })
         }
 
-        const rm = await RedeemMerchant.query().where('partner_id', request.all().partner_id).where('store_id', request.all().store_id).first()
-        if(!rm){
-            return response.json({
-                status: false,
-                message: 'invalid store'
-            })
-        }
+        const rm = await RedeemMerchant.query()
+            .where('partner_id', request.all().partner_id)
+            .where('store_id', request.all().store_id)
+            .first()
+            || await RedeemMerchant.query()
+                .where('partner_id', request.all().partner_id)
+                .first()
 
         try {
 
-            const ve = new VoucherExchange()
+            if (rm) {
+                const ve = new VoucherExchange()
 
-            ve.member_voucher_id = request.all().member_voucher_id
-            ve.redeem_merchant_id = rm.redeem_merchant_id
-            ve.note = request.all().note
-            await ve.save(trx)
+                ve.member_voucher_id = request.all().member_voucher_id
+                ve.redeem_merchant_id = rm.redeem_merchant_id
+                ve.note = request.all().note
+                await ve.save(trx)
+            }
 
             member_voucher.used = '1'
             await member_voucher.save(trx)

@@ -24,13 +24,25 @@ class CartController {
                         const menuData = res.data.data || {}
                         out.current_price = menuData.current_price || item.current_price || null
                         out.menu_current_quantity = menuData.menu_current_quantity || item.menu_current_quantity || null
+                        out.item_sku = menuData.item_sku || item.item_sku || null
+                        out.sku = menuData.item_sku || item.sku || null
+                        out.product_sku = menuData.item_sku || item.product_sku || null
+                        out.menu_sku = menuData.item_sku || item.menu_sku || null
                     } else {
                         out.current_price = null
                         out.menu_current_quantity = null
+                        out.item_sku = item.item_sku || null
+                        out.sku = item.sku || null
+                        out.product_sku = item.product_sku || null
+                        out.menu_sku = item.menu_sku || null
                     }
                 } catch (error) {
                     out.current_price = null
                     out.menu_current_quantity = null
+                    out.item_sku = item.item_sku || null
+                    out.sku = item.sku || null
+                    out.product_sku = item.product_sku || null
+                    out.menu_sku = item.menu_sku || null
                 }
                 return out
             }))
