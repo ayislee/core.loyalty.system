@@ -50,15 +50,23 @@ class MasterController {
         }
     }
 
-    async payment({request, response}) {
-        const req = request.all()
+    async payment({response}) {
         try {
-            const res = await axios.get(Env.get('MARKETPLACE_CORE')+`list/ms_payment`)
+            const res = await axios.get(Env.get('MARKETPLACE_CORE')+`list/ms_payment`, {
+                params: {
+                    ms_payment_identifier: 'MIDTRANS'
+                }
+            })
             // console.log(res.data)
             if(res.data.success){
+                const paymentList = Array.isArray(res.data.data) ? res.data.data : []
+                const midtransPayment = paymentList.filter((payment) =>
+                    `${payment?.ms_payment_identifier || ''}`.trim().toUpperCase() === 'MIDTRANS'
+                )
+
                 return response.json({
                     status: true,   
-                    data: res.data.data
+                    data: midtransPayment
                 })
             }else{
                 return response.json({

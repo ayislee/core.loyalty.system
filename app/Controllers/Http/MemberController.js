@@ -6,8 +6,6 @@ const Point = use('App/Models/Point')
 const PointHistory = use('App/Models/PointHistory')
 const Voucher = use('App/Models/Voucher')
 const MemberVoucher = use('App/Models/MemberVoucher')
-const VoucherExchange = use('App/Models/VoucherExchange')
-const RedeemMerchant = use('App/Models/RedeemMerchant')
 const Database = use('Database')
 const Event = use('Event')
 const Env = use('Env')
@@ -26,6 +24,7 @@ const MemberActivityLogger = use('App/Helpers/MemberActivityLogger')
 const Email = use('App/Lib/Email')
 const WhatsappAPI = use('App/Lib/WhatsappAPI')
 const uuid = use('uuid')
+const MemberVoucherLifecycleService = use('App/Services/MemberVoucherLifecycleService')
 
 class MemberController {
     generateVerificationToken() {
@@ -1013,62 +1012,27 @@ class MemberController {
     }
 
     async voucher_exchange({request, response}){
-
-        const trx = await Database.beginTransaction()
-
-        const member_voucher = await MemberVoucher.query()
-        .where('member_voucher_id', request.all().member_voucher_id)
-        .where('used','0')
-        .first()
-
-        if(!member_voucher){
-            await trx.rollback()
-            return response.json({
-                status: true,
-                message: 'invalid voucher'
-            })
-        }
-
-        const rm = await RedeemMerchant.query()
-            .where('partner_id', request.all().partner_id)
-            .where('store_id', request.all().store_id)
-            .first()
-            || await RedeemMerchant.query()
-                .where('partner_id', request.all().partner_id)
-                .first()
-
         try {
-
-            if (rm) {
-                const ve = new VoucherExchange()
-
-                ve.member_voucher_id = request.all().member_voucher_id
-                ve.redeem_merchant_id = rm.redeem_merchant_id
-                ve.note = request.all().note
-                await ve.save(trx)
-            }
-
-            member_voucher.used = '1'
-            await member_voucher.save(trx)
-
-            await trx.commit()
-
-            return response.json({
-                status: true,
-                message: 'success'
-             })
-
-            
-
-         } catch (error) {
-            console.log(error)
-            await trx.rollback()
+            const result = await MemberVoucherLifecycleService.exchange(request.all())
+            return response.json(result)
+        } catch (error) {
             return response.json({
                 status: false,
-                message: 'something error'
+                message: error.message || 'something error'
             })
         }
+    }
 
+    async voucher_return({request, response}){
+        try {
+            const result = await MemberVoucherLifecycleService.returnVoucher(request.all())
+            return response.json(result)
+        } catch (error) {
+            return response.json({
+                status: false,
+                message: error.message || 'something error'
+            })
+        }
     }
 
     // Admin Member

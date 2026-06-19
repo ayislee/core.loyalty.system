@@ -1,357 +1,254 @@
-# Issue: Pencatatan Laporan Penjualan Harian dan Balance Company/Toko
+# Issue: Kembalikan Voucher Loyalty Saat Transaksi Gagal
 
 ## Informasi Umum
-1. `core.loyalty.system` adalah backend loyalty / proxy.
-2. `client.loyalty.system` adalah frontend loyalty customer.
+
+1. `core.loyalty.system` adalah backend loyalty sekaligus proxy ke marketplace.
+2. `client.loyalty.system` adalah frontend customer loyalty.
 3. `cms.loyalty.system` adalah frontend management loyalty.
-4. `backend-mediacartz` adalah backend marketplace / `MARKETPLACE_CORE`.
-5. `frontend-mediacartz` adalah frontend marketplace untuk `backend-mediacartz`.
+4. `backend-mediacartz` adalah backend marketplace dan nilai `MARKETPLACE_CORE` pada environment `core.loyalty.system`.
+5. `frontend-mediacartz` atau `frontend-mediacartz-react` adalah frontend marketplace untuk `backend-mediacartz`.
+6. Komunikasi `client.loyalty.system` dengan `backend-mediacartz` harus melalui `core.loyalty.system`.
 
 ## Latar Belakang
-Marketplace di `client.loyalty.system` pada dasarnya adalah penjualan toko/company di platform loyalty.
 
-Pembayaran dari customer masuk dan ditampung dahulu oleh platform loyalty. Setelah itu, toko/company akan memiliki tagihan atau saldo klaim ke platform loyalty berdasarkan transaksi yang terjadi.
+Pada checkout loyalty, customer dapat memakai voucher miliknya melalui `member_voucher_id`. Setelah transaksi retail berhasil dibuat di `backend-mediacartz`, event `LoyaltyService::exchangeVoucher` memanggil endpoint berikut pada `core.loyalty.system`:
 
-Saat ini `core.loyalty.system` sudah menyimpan snapshot transaksi pada tabel `transactions`, tetapi datanya masih berupa `request` dan `response` mentah dari `MARKETPLACE_CORE`. Data ini belum cukup rapi untuk kebutuhan:
-1. laporan penjualan harian per company/platform,
-2. balance tiap company/toko,
-3. rekonsiliasi transaksi yang sudah dibayar, selesai, gagal, refund, atau perlu ditagihkan.
+```text
+POST /api/v1/merchant/member/voucher/exchange
+```
+
+Endpoint tersebut mengubah `member_vouchers.used` dari `0` menjadi `1` dan mencatat pemakaian pada `voucher_exchanges`.
+
+Saat transaksi dibatalkan atau gagal, `TransactionService.processReject` saat ini hanya mengembalikan stok dan mengurangi `voucher_usage_quantity` untuk voucher marketplace yang memakai `voucher_id`. Belum ada proses untuk mengembalikan voucher loyalty yang tersimpan pada `transaction.member_voucher_id`. Akibatnya, voucher tetap berstatus sudah digunakan walaupun transaksi tidak berhasil diselesaikan.
+
+## Definisi Bisnis
+
+1. Voucher yang dikembalikan dalam issue ini adalah voucher loyalty milik member yang direferensikan oleh `transaction.member_voucher_id`, bukan master voucher marketplace pada `transaction.voucher_id`.
+2. Voucher dikembalikan ketika transaksi retail berakhir pada status terminal `rejected` atau `failed`.
+3. Kondisi tersebut mencakup pembatalan manual, MIDTRANS `cancel`, `deny`, atau `expire`, timeout transaksi, dan proses lain yang pada akhirnya menetapkan transaksi ke status terminal tersebut.
+4. Status `pending`, `verified`, `progressing`, dan status pengiriman yang masih dapat diproses ulang tidak boleh mengembalikan voucher.
+5. Kegagalan atau penolakan kurir saja tidak menjadi pemicu selama transaksi belum ditetapkan sebagai `rejected` atau `failed`.
+6. Pengembalian hanya mengaktifkan kembali voucher yang sama. Poin yang sebelumnya digunakan member untuk membeli voucher tidak dikembalikan.
+7. Masa berlaku voucher tidak diperpanjang. Voucher yang sudah melewati `expire_date` tetap tidak dapat digunakan walaupun flag `used` sudah dikembalikan ke `0`.
 
 ## Tujuan
-1. Setiap transaksi marketplace yang dibuat lewat `client.loyalty.system` tercatat sebagai data finansial di `core.loyalty.system`.
-2. Tersedia laporan penjualan harian per company dan/atau toko.
-3. Tersedia balance/saldo tiap company dan toko yang menggambarkan kewajiban platform loyalty kepada company/toko.
-4. Pencatatan bersifat idempotent, sehingga transaksi yang sama tidak boleh tercatat dua kali.
-5. Data laporan tetap mengikuti arsitektur komunikasi:
+
+1. Voucher loyalty dapat digunakan kembali setelah transaksi yang memakainya benar-benar gagal.
+2. Pengembalian dipicu oleh backend berdasarkan status transaksi, bukan oleh halaman error pada browser.
+3. Exchange dan return aman terhadap callback ganda, retry queue, restart aplikasi, dan urutan event yang terbalik.
+4. Riwayat pemakaian dan pengembalian voucher dapat diaudit berdasarkan transaksi marketplace.
+5. Transaksi berhasil atau transaksi yang masih berjalan tidak terpengaruh.
+
+## Kondisi Saat Ini
+
+### `backend-mediacartz`
+
+File utama:
 
 ```text
-client.loyalty.system -> core.loyalty.system -> backend-mediacartz
+app/Controllers/Http/TransactionController.js
+app/Services/TransactionService.js
+app/Services/LoyaltyService.js
+start/events.js
+start/bull.js
 ```
 
-Frontend tidak boleh langsung mengambil laporan finansial dari `backend-mediacartz`.
+Alur saat ini:
 
-## Definisi Bisnis Awal
-1. `core.loyalty.system` menjadi sumber pencatatan settlement untuk transaksi yang berasal dari platform loyalty.
-2. `backend-mediacartz` tetap menjadi sumber data transaksi marketplace, produk, toko, ongkir, dan status transaksi.
-3. `company balance` adalah saldo yang nanti dapat ditagihkan/dicairkan oleh company/toko kepada platform loyalty.
-4. Transaksi baru boleh menambah saldo payable jika sudah memenuhi status bisnis yang disepakati.
-5. Rekomendasi awal:
-   - transaksi dibuat: catat sebagai `pending`;
-   - pembayaran berhasil: catat sebagai `paid` atau `verified`;
-   - barang diterima/transaksi `complete`: saldo masuk ke `available`;
-   - transaksi gagal/refund/cancel: saldo dibatalkan atau dikoreksi.
+1. `TransactionController` menyimpan `member_voucher_id` dan snapshot `member_voucher_data` pada transaksi retail.
+2. Setelah transaksi dibuat, event `LoyaltyService::exchangeVoucher` dikirim tanpa referensi transaksi.
+3. Worker exchange selalu menyelesaikan job walaupun service mengembalikan error, sehingga kegagalan komunikasi belum mendapatkan retry yang dapat diandalkan.
+4. MIDTRANS `cancel`, `deny`, dan `expire`, penolakan manual, serta timeout memanggil `TransactionService.processReject`.
+5. `processReject` belum memanggil loyalty untuk mengembalikan `member_voucher_id`.
+6. `processApproval` juga dapat menetapkan status `failed` ketika proses approval gagal, tetapi belum menjalankan pengembalian voucher.
 
-Status final perlu mengikuti status dari `backend-mediacartz`, tetapi struktur ledger di loyalty harus siap untuk koreksi status.
+### `core.loyalty.system`
 
-## Scope Backend `core.loyalty.system`
-
-File referensi:
+File utama:
 
 ```text
-core.loyalty.system/app/Controllers/Http/TransactionController.js
-core.loyalty.system/app/Models/Transaction.js
-core.loyalty.system/app/Controllers/Http/DashboardController.js
-core.loyalty.system/start/routes/member.js
-core.loyalty.system/start/routes/*.js
-core.loyalty.system/database/migrations
+app/Controllers/Http/MemberController.js
+app/Models/MemberVoucher.js
+app/Models/VoucherExchange.js
+app/Middleware/AuthMerchant.js
+start/routes/merchant.js
+database/migrations/*voucher_exchange*
 ```
 
-### 1. Tambahkan Tabel Pencatatan Transaksi Finansial
+Alur saat ini:
 
-Buat tabel baru untuk menyimpan transaksi finansial yang sudah dinormalisasi dari response marketplace.
+1. `MemberController.voucher_exchange` mencari `member_vouchers.used = 0`.
+2. Voucher kemudian diubah menjadi `used = 1`.
+3. Jika redeem merchant ditemukan, data pemakaian disimpan ke `voucher_exchanges`.
+4. Belum ada endpoint untuk membatalkan exchange atau mengembalikan voucher.
+5. `voucher_exchanges` belum menyimpan referensi transaksi marketplace dan unique key lama membatasi kombinasi member voucher dan redeem merchant. Struktur ini perlu disesuaikan agar voucher yang telah dikembalikan dapat dipakai lagi pada transaksi baru tanpa menghapus histori lama.
 
-Contoh nama tabel:
+## Scope Implementasi
+
+### 1. Kontrak Lifecycle Voucher
+
+Gunakan referensi transaksi marketplace yang stabil pada setiap operasi exchange dan return. Nilai yang disarankan:
 
 ```text
-marketplace_sales
+transaction_id
+transaction_number
 ```
 
-Field yang disarankan:
-1. `marketplace_sale_id`
-2. `transaction_number`
-3. `marketplace_transaction_id`
-4. `member_id`
-5. `company_slug`
-6. `company_id` jika tersedia dari marketplace
-7. `store_id`
-8. `store_slug`
-9. `store_name`
-10. `transaction_date`
-11. `transaction_status`
-12. `payment_status`
-13. `shipping_status`
-14. `gross_amount`
-15. `discount_amount`
-16. `voucher_amount`
-17. `shipping_fee`
-18. `administration_fee`
-19. `net_sales_amount`
-20. `payable_amount`
-21. `platform_fee`
-22. `settlement_status`
-23. `source_request`
-24. `source_response`
-25. `created_at`
-26. `updated_at`
+Minimal satu nilai wajib tersedia dan harus konsisten pada exchange serta return. `transaction_id` dapat menjadi referensi internal integrasi, sedangkan `transaction_number` disimpan untuk audit dan penelusuran.
 
-Catatan:
-1. `transaction_number` harus unique.
-2. Simpan `source_response` untuk audit, tetapi laporan jangan bergantung pada parsing JSON mentah setiap kali.
-3. `payable_amount` adalah nilai yang masuk ke balance company/toko. Formula awal bisa dibuat eksplisit di service agar mudah diubah.
-
-### 2. Tambahkan Ledger Balance
-
-Jangan hanya menyimpan saldo akhir tanpa history. Buat ledger mutasi balance agar setiap perubahan bisa diaudit.
-
-Contoh tabel:
+Lifecycle yang harus didukung:
 
 ```text
-company_store_balance_mutations
+available -> exchanged -> returned
 ```
 
-Field yang disarankan:
-1. `balance_mutation_id`
-2. `company_slug`
-3. `company_id`
-4. `store_id`
-5. `store_slug`
-6. `transaction_number`
-7. `mutation_type`
-8. `mutation_status`
-9. `amount`
-10. `balance_before`
-11. `balance_after`
-12. `description`
-13. `reference_type`
-14. `reference_id`
-15. `created_at`
-16. `updated_at`
+Voucher dengan lifecycle `returned` dapat kembali menjadi `exchanged` hanya melalui transaksi baru dengan referensi transaksi yang berbeda.
 
-Contoh `mutation_type`:
-1. `sale_pending`
-2. `sale_available`
-3. `sale_cancelled`
-4. `refund`
-5. `settlement_paid`
-6. `manual_adjustment`
+### 2. Perubahan `core.loyalty.system`
 
-Tambahkan juga tabel ringkasan saldo agar query dashboard cepat.
+#### Endpoint Return
 
-Contoh nama tabel:
+Tambahkan endpoint merchant yang dilindungi `AuthMerchant`, misalnya:
 
 ```text
-company_store_balances
+POST /api/v1/merchant/member/voucher/return
 ```
 
-Field yang disarankan:
-1. `company_slug`
-2. `company_id`
-3. `store_id`
-4. `store_slug`
-5. `pending_balance`
-6. `available_balance`
-7. `paid_balance`
-8. `cancelled_balance`
-9. `last_mutation_at`
+Payload minimal:
 
-### 3. Tambahkan Rekap Penjualan Harian
-
-Buat tabel rekap harian agar laporan tidak selalu menghitung dari semua transaksi.
-
-Contoh nama tabel:
-
-```text
-daily_company_sales_reports
+```json
+{
+  "cid": "merchant-client-id",
+  "sid": "merchant-server-id",
+  "member_voucher_id": 123,
+  "store_id": 10,
+  "transaction_id": 456,
+  "transaction_number": "transaction-number",
+  "reason": "Transaction rejected"
+}
 ```
 
-Field yang disarankan:
-1. `report_date`
-2. `company_slug`
-3. `company_id`
-4. `store_id`
-5. `store_slug`
-6. `transaction_count`
-7. `gross_amount`
-8. `discount_amount`
-9. `voucher_amount`
-10. `shipping_fee`
-11. `net_sales_amount`
-12. `payable_amount`
-13. `cancelled_amount`
-14. `refund_amount`
-15. `created_at`
-16. `updated_at`
+Nama endpoint dan field dapat mengikuti konvensi project, tetapi kontrak exchange dan return harus memakai referensi transaksi yang sama.
 
-Berikan unique key minimal pada:
+#### Validasi dan Proses Return
 
-```text
-report_date + company_slug + store_id/store_slug
-```
+1. Validasi `member_voucher_id`, referensi transaksi, partner dari `cid`/`sid`, dan hubungan voucher dengan partner/company yang melakukan request.
+2. Cari record exchange berdasarkan `member_voucher_id` dan referensi transaksi, bukan hanya berdasarkan store.
+3. Jalankan perubahan `voucher_exchanges` dan `member_vouchers` dalam satu database transaction.
+4. Ubah exchange menjadi `returned`, simpan `returned_at`, alasan, dan informasi audit yang diperlukan.
+5. Ubah `member_vouchers.used` menjadi `0` hanya jika tidak ada exchange aktif lain untuk voucher tersebut.
+6. Jangan mengubah `expire_date`, snapshot discount, jumlah poin, atau kepemilikan voucher.
+7. Request return kedua untuk transaksi yang sama harus menghasilkan response sukses idempotent tanpa membuat histori ganda.
+8. Request untuk voucher yang tidak dimiliki partner terkait harus ditolak.
 
-### 4. Tambahkan Service Pencatatan
+#### Penyesuaian Exchange dan Database
 
-Buat service khusus agar logic finansial tidak menumpuk di controller.
+1. Tambahkan referensi transaksi dan status lifecycle pada `voucher_exchanges`, beserta timestamp/alasan return yang diperlukan.
+2. Sesuaikan unique constraint agar satu transaksi hanya memiliki satu exchange, tetapi voucher yang sudah returned dapat dipakai pada transaksi baru.
+3. Jangan menghapus record exchange lama saat voucher dikembalikan karena record tersebut merupakan histori audit.
+4. Perbarui endpoint exchange agar menerima referensi transaksi dan idempotent:
+   - exchange berulang untuk transaksi yang sama menghasilkan sukses tanpa record ganda;
+   - exchange untuk transaksi baru hanya berhasil jika voucher tersedia dan belum kedaluwarsa;
+   - exchange wajib memvalidasi partner/company pemilik voucher.
+5. Antisipasi return yang diproses lebih dahulu daripada exchange. Simpan return intent untuk referensi transaksi tersebut atau gunakan mekanisme lifecycle setara, sehingga exchange yang datang terlambat tidak mengubah voucher menjadi `used = 1` kembali.
+6. Migration harus mempertahankan data `voucher_exchanges` yang sudah ada. Berikan nilai status awal yang sesuai untuk record lama dan jangan menghapus histori produksi.
 
-Contoh nama service:
+### 3. Perubahan `backend-mediacartz`
 
-```text
-app/Services/MarketplaceSalesLedgerService.js
-```
+#### Kirim Referensi Saat Exchange
 
-Tanggung jawab service:
-1. menerima response transaksi dari `backend-mediacartz`,
-2. menormalisasi field transaksi,
-3. membuat/men-update row `marketplace_sales`,
-4. membuat mutasi ledger balance,
-5. meng-update saldo ringkasan,
-6. meng-update rekap harian,
-7. menjaga idempotency berdasarkan `transaction_number`.
+Pada pembuatan transaksi retail:
 
-Service ini perlu dipanggil dari:
-1. `TransactionController.create` setelah transaksi berhasil dibuat dan bukan `preview_fee`;
-2. endpoint update status transaksi jika ada di `core.loyalty.system`;
-3. job rekonsiliasi status transaksi dari `backend-mediacartz`.
+1. Sertakan `transaction_id` dan `transaction_number` ketika mengirim `LoyaltyService::exchangeVoucher`.
+2. Kirim event setelah transaksi lokal berhasil disimpan/commit agar core tidak menerima referensi transaksi yang akhirnya rollback.
+3. Pertahankan `member_voucher_id` dan `member_voucher_data` pada transaksi untuk kebutuhan audit dan tampilan detail.
 
-### 5. Integrasi dengan `TransactionController.create`
+#### Trigger Return Terpusat
 
-Pada flow:
+Tambahkan satu method terpusat, misalnya `returnLoyaltyVoucher`, yang hanya berjalan apabila:
 
-```text
-client.loyalty.system /order
--> core.loyalty.system member/transaction
--> backend-mediacartz transaction/retail/order
-```
+1. Jenis transaksi adalah `PURCHASE_RETAIL`.
+2. `transaction.member_voucher_id` memiliki nilai.
+3. Status akhir transaksi adalah `rejected` atau `failed`.
 
-Saat `backend-mediacartz` mengembalikan transaksi sukses:
-1. tetap simpan snapshot ke tabel `transactions` seperti saat ini;
-2. panggil `MarketplaceSalesLedgerService.recordFromMarketplaceTransaction`;
-3. jangan mencatat untuk request `preview_fee`;
-4. gunakan `transaction_number` dari response marketplace sebagai key idempotency.
+Panggil method tersebut setelah perubahan status lokal berhasil di-commit dari:
 
-### 6. Rekonsiliasi Status
+1. `TransactionService.processReject` untuk pembatalan manual, kegagalan MIDTRANS, dan timeout.
+2. Cabang kegagalan `TransactionService.processApproval` yang menghasilkan status `failed`.
+3. Jalur lain yang secara langsung menetapkan transaksi retail ke status terminal tanpa melalui kedua method tersebut, jika ditemukan saat implementasi.
 
-Karena status transaksi bisa berubah setelah order dibuat, perlu mekanisme rekonsiliasi.
+Jangan memanggil return berdasarkan route frontend, redirect MIDTRANS, atau status pengiriman sementara.
+
+#### Service dan Queue
+
+1. Tambahkan method pada `LoyaltyService` untuk memanggil endpoint return di `core.loyalty.system`.
+2. Gunakan konfigurasi loyalty company yang sama dengan exchange (`cid`, `sid`, dan `LOYALTYPOINT_API_URL`).
+3. Worker harus melempar error ketika HTTP error, timeout, response `status: false`, atau response tidak valid. Jangan menandai job selesai jika return belum diterima core.
+4. Atur retry dan backoff pada job exchange dan return agar gangguan sementara atau restart aplikasi tidak menghilangkan proses.
+5. Pastikan retry aman karena endpoint core bersifat idempotent.
+6. Log minimal harus memuat `transaction_id`, `transaction_number`, dan `member_voucher_id`, tanpa menulis credential `cid` atau `sid`.
+7. Hindari decrement atau return berulang jika callback MIDTRANS atau perintah reject diterima lebih dari sekali.
+
+### 4. Perubahan `client.loyalty.system`
+
+Frontend bukan sumber kebenaran pengembalian voucher.
 
 Rencana:
-1. Buat command/job terjadwal di `core.loyalty.system`.
-2. Job mengambil transaksi dari `marketplace_sales` yang belum final.
-3. Untuk setiap transaksi, panggil `MARKETPLACE_CORE` melalui endpoint detail transaksi.
-4. Jika status berubah, update `marketplace_sales`, ledger balance, dan laporan harian.
-5. Status final yang perlu diperhatikan:
-   - `complete`
-   - `cancelled`
-   - `failed`
-   - `refund`
-   - status lain yang sudah ada di `backend-mediacartz`.
 
-Catatan:
-1. Hindari update saldo langsung tanpa mutasi ledger.
-2. Jika ada koreksi, buat mutasi pembalik atau adjustment agar audit tetap jelas.
+1. Jangan menambahkan request return voucher dari halaman error transaksi.
+2. Setelah transaksi gagal dan user kembali membuka daftar voucher atau halaman `/order`, ambil ulang data voucher dari `core.loyalty.system` agar voucher yang sudah returned muncul sebagai tersedia.
+3. Jangan mengaktifkan voucher hanya dengan mengubah state lokal.
+4. Pertahankan payload `voucher_code` dan flow checkout yang sudah ada, kecuali ada penyesuaian kontrak internal antara core dan marketplace untuk meneruskan referensi transaksi.
 
-## Scope CMS `cms.loyalty.system`
+### 5. Observability dan Rekonsiliasi
 
-Tambahkan halaman management untuk melihat laporan dan balance.
+1. Sediakan log yang dapat menelusuri exchange dan return berdasarkan nomor transaksi.
+2. Status queue yang gagal harus tetap dapat dilihat dan dijalankan ulang.
+3. Pertimbangkan command/job rekonsiliasi untuk mencari transaksi terminal dengan `member_voucher_id` yang exchange-nya belum returned. Command ini menjadi perlindungan untuk data lama atau kegagalan queue berkepanjangan.
+4. Rekonsiliasi harus memanggil kontrak return yang sama dan tetap idempotent.
 
-Rencana halaman:
-1. Laporan penjualan harian.
-2. Detail laporan per company.
-3. Detail laporan per toko.
-4. Balance company/toko.
-5. Riwayat mutasi balance.
+## Batasan dan Di Luar Scope
 
-Filter minimal:
-1. tanggal mulai dan tanggal akhir,
-2. company,
-3. toko,
-4. status settlement,
-5. status transaksi.
-
-Data yang ditampilkan minimal:
-1. jumlah transaksi,
-2. gross sales,
-3. diskon/voucher,
-4. ongkir,
-5. net sales,
-6. payable amount,
-7. pending balance,
-8. available balance,
-9. paid balance.
-
-## Scope API Backend untuk CMS
-
-Tambahkan endpoint di `core.loyalty.system` untuk CMS.
-
-Contoh endpoint:
-
-```text
-GET /api/v1/admin/marketplace-sales/daily-report
-GET /api/v1/admin/marketplace-sales/balance
-GET /api/v1/admin/marketplace-sales/balance-mutations
-GET /api/v1/admin/marketplace-sales/transactions
-```
-
-Hak akses:
-1. Admin platform bisa melihat semua company/toko.
-2. User partner/company hanya boleh melihat data company miliknya.
-3. Jangan expose raw `source_request` dan `source_response` ke user biasa, kecuali role admin/debug.
-
-## Scope `backend-mediacartz`
-
-Perubahan di `backend-mediacartz` dibuat minimal.
-
-Yang perlu dipastikan:
-1. Endpoint detail transaksi mengembalikan data yang cukup untuk rekonsiliasi:
-   - `transaction_number`,
-   - status transaksi,
-   - status payment,
-   - status shipping,
-   - company/store,
-   - total amount,
-   - discount,
-   - shipping fee,
-   - voucher/member voucher jika ada.
-2. Jika field company/store belum konsisten, tambahkan field yang dibutuhkan tanpa merusak response lama.
-3. Jangan membuat `client.loyalty.system` langsung memanggil `backend-mediacartz` untuk laporan.
-
-## Formula Awal yang Perlu Disepakati
-
-Sebelum implementasi final, pastikan formula ini disetujui:
-
-```text
-gross_amount = total harga produk sebelum diskon
-net_sales_amount = gross_amount - discount_amount - voucher_amount
-payable_amount = net_sales_amount + shipping_fee - platform_fee
-```
-
-Hal yang perlu diputuskan:
-1. Apakah ongkir masuk balance toko atau dipisah sebagai biaya kurir/platform.
-2. Apakah voucher loyalty ditanggung platform loyalty atau company.
-3. Apakah platform fee/komisi sudah ada sekarang atau disiapkan field-nya dulu dengan default `0`.
-4. Kapan saldo menjadi `available`: saat pembayaran sukses atau saat transaksi `complete`.
-
-Rekomendasi awal:
-1. Saldo masuk `pending_balance` saat pembayaran sukses.
-2. Saldo pindah ke `available_balance` saat transaksi `complete`.
-3. Jika transaksi gagal sebelum complete, saldo pending dibatalkan.
+1. Mengembalikan poin yang dipakai untuk membeli voucher.
+2. Memperpanjang tanggal kedaluwarsa voucher.
+3. Mengubah aturan diskon, free delivery, SKU, atau company voucher.
+4. Mengubah mekanisme voucher marketplace yang memakai `transaction.voucher_id`, kecuali perbaikan idempotensi yang benar-benar diperlukan agar tidak terjadi decrement ganda.
+5. Mengembalikan voucher ketika transaksi masih dapat dilanjutkan atau pengiriman masih dapat di-retry.
+6. Membuat frontend berkomunikasi langsung dengan `backend-mediacartz`.
 
 ## Acceptance Criteria
-1. Setiap transaksi marketplace yang dibuat dari `client.loyalty.system` tercatat di tabel transaksi finansial loyalty.
-2. Transaksi yang sama tidak tercatat dua kali walaupun request diproses ulang.
-3. Laporan harian bisa menampilkan total transaksi per company/toko.
-4. Balance company/toko bisa menampilkan pending, available, paid, dan cancelled balance.
-5. Perubahan status transaksi menghasilkan mutasi ledger yang bisa diaudit.
-6. CMS bisa mengambil data laporan dan balance melalui API `core.loyalty.system`.
-7. Akses data laporan mengikuti role user.
-8. Raw response marketplace tetap tersimpan untuk audit, tetapi laporan menggunakan field yang sudah dinormalisasi.
+
+1. Transaksi retail dengan `member_voucher_id` yang berakhir `rejected` membuat voucher tersebut tersedia kembali.
+2. Transaksi retail dengan `member_voucher_id` yang berakhir `failed` membuat voucher tersebut tersedia kembali.
+3. MIDTRANS `cancel`, `deny`, dan `expire` menghasilkan pengembalian voucher setelah transaksi menjadi terminal.
+4. Pembatalan manual dan timeout transaksi menghasilkan perilaku yang sama.
+5. Transaksi `pending`, `verified`, `progressing`, `approved`, atau `completed` tidak mengembalikan voucher.
+6. Return tidak mengubah poin member, nilai voucher, snapshot voucher, atau `expire_date`.
+7. Voucher kedaluwarsa tidak dapat dipakai walaupun status pemakaiannya telah dikembalikan.
+8. Callback/reject/return yang dikirim berulang tidak membuat histori ganda dan tidak menghasilkan perubahan state berulang.
+9. Jika return diproses sebelum exchange, exchange yang terlambat tidak membuat voucher kembali berstatus used.
+10. Jika core sementara tidak dapat diakses, job gagal tersimpan dan dapat di-retry sampai return berhasil.
+11. Histori exchange dan return dapat ditelusuri menggunakan `transaction_id` atau `transaction_number`.
+12. Voucher yang sudah returned dapat dipakai pada transaksi baru yang valid.
+13. Voucher milik partner/company lain tidak dapat di-return melalui credential merchant yang berbeda.
+14. Frontend menampilkan voucher sebagai tersedia setelah mengambil ulang data dari core.
 
 ## Skenario Test
-Tidak perlu membuat instruksi unit test terlalu detail. Cukup pastikan skenario berikut tercakup:
 
-1. Order sukses dari `/order` membuat row transaksi finansial dan mutasi balance.
-2. Request transaksi yang sama diproses ulang tidak membuat double pencatatan.
-3. Transaksi dengan voucher/diskon menghasilkan nilai laporan yang benar.
-4. Transaksi gagal/cancel membuat koreksi balance.
-5. Transaksi berubah menjadi `complete` memindahkan saldo dari pending ke available.
-6. Rekap harian menampilkan angka sesuai transaksi pada tanggal tersebut.
-7. User partner hanya bisa melihat laporan company miliknya.
-8. Admin platform bisa melihat semua laporan company/toko.
+Detail implementasi test diserahkan kepada programmer yang mengerjakan. Skenario yang perlu dicakup:
+
+1. Transaksi MIDTRANS memakai voucher lalu menerima status `expire`.
+2. Transaksi memakai voucher lalu dibatalkan manual.
+3. Transaksi memakai voucher lalu gagal pada proses approval.
+4. Transaksi timeout dan diproses oleh penutupan otomatis.
+5. Transaksi berhasil sampai selesai dan voucher tetap used.
+6. Status pengiriman gagal sementara tetapi transaksi belum terminal, sehingga voucher belum dikembalikan.
+7. Return yang sama dipanggil dua kali.
+8. Exchange yang sama dipanggil dua kali.
+9. Return diproses sebelum job exchange.
+10. Core tidak dapat diakses pada percobaan pertama lalu queue berhasil pada retry.
+11. Voucher returned yang belum kedaluwarsa digunakan pada transaksi baru.
+12. Voucher returned yang sudah kedaluwarsa tetap tidak dapat digunakan.
+13. Merchant mencoba mengembalikan voucher milik company lain.
+14. Transaksi tanpa `member_voucher_id` tidak memanggil endpoint return.
+15. Daftar voucher pada frontend diperbarui setelah transaksi gagal.

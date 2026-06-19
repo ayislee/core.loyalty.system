@@ -14,7 +14,6 @@ class VoucherExchange extends Model {
 
     static boot () {
         super.boot()
-        this.addTrait('@provider:Lucid/SoftDeletes')
         this.addTrait('Filter')
 		this.addTrait('OrderBy')
         

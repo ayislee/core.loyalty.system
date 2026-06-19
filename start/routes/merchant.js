@@ -10,6 +10,7 @@ Route.group(()=>{
     Route.get('/member/getpoint','MemberController.getpoint').validator('PhoneEmail').middleware(['ConvertPhone'])
     Route.get('/member/getvoucher','MemberController.getvoucher').validator('Code')
     Route.post('/member/voucher/exchange','MemberController.voucher_exchange')
+    Route.post('/member/voucher/return','MemberController.voucher_return')
     Route.post('/member/request/auth','MemberController.request_auth').validator('EmailExists')
 
    

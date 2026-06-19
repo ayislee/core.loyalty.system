@@ -6,7 +6,11 @@ informasi umum:
 4. backend-mediacartz = backend marketplace / MARKETPLACE_CORE
 5. frontend-mediacartz = frontend marketplace untuk backend-mediacartz
 
+latar belakang:
+marketpalace di client.loyalty.system pada dasarnya penjualan toko di platform loyalty. pembayaran di tampung dahulu di loyalty yang di kemudian hari akan menjadi tagihan toko/company ke platform loyalti. untuk itu setiap transaksi di loyalty catat
 
 planing nya adalah:
-1. pada client.royalty.system, halaman di /order, voucher hanya bisa di klaim pada company yan mengeluarkan voucher  
+1. buatkan fitur pencatatan laporan penjualan tiap company/platform harian dan balance tiap-tiap company/toko
+  
+
 jangan buatkan terlalu detain instruksi unit test nya. buatkan saja skenario apa yang harus di test, biarkan yang mengimplementasi detail skenarionya adalah junior programer atau model ai yang lebih murah
