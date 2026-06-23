@@ -14,6 +14,7 @@ const MemberVoucher = use('App/Models/MemberVoucher')
 const VoucherSnapshot = use('App/Helpers/VoucherSnapshot')
 const WhatsappAPI = use('App/Lib/WhatsappAPI')
 const BasicEmailService = use('App/Lib/BasicEmailService')
+const Database = use('Database')
 
 const TOKEN_VALID_MINUTES = 5
 
@@ -84,6 +85,7 @@ class VoucherRedeemConfirmationService {
             pointHistory.ref_id = uuid.v4()
             pointHistory.point = parseFloat(confirmation.point)
             pointHistory.desc = `Release hold redeem ${voucher ? voucher.name : 'voucher'}`
+            pointHistory.source_type = 'voucher_release'
             if (voucher && voucher.partner_id) {
                 pointHistory.partner_id = voucher.partner_id
             }
@@ -174,6 +176,7 @@ class VoucherRedeemConfirmationService {
         holdHistory.ref_id = uuid.v4()
         holdHistory.point = 0 - parseFloat(voucher.number_point)
         holdHistory.desc = `Hold redeem ${voucher.name}`
+        holdHistory.source_type = 'voucher_hold'
         if (voucher.partner_id) {
             holdHistory.partner_id = voucher.partner_id
         }
@@ -270,19 +273,48 @@ class VoucherRedeemConfirmationService {
             }
         }
 
+        const trx = await Database.beginTransaction()
+
         try {
+            const lockedConfirmation = await VoucherRedeemConfirmation.query()
+                .transacting(trx)
+                .where('voucher_redeem_confirmation_id', confirmationId)
+                .where('member_id', memberId)
+                .forUpdate()
+                .first()
+
+            if (!lockedConfirmation || lockedConfirmation.status !== 'pending') {
+                await trx.rollback()
+                return {
+                    status: false,
+                    message: lockedConfirmation && lockedConfirmation.status === 'confirmed'
+                        ? 'Token sudah digunakan'
+                        : 'Token sudah kedaluwarsa'
+                }
+            }
+
+            if (moment(lockedConfirmation.token_valid_until).isSameOrBefore(moment())) {
+                await trx.rollback()
+                await this.releaseHold(confirmation, 'expired')
+                return {
+                    status: false,
+                    message: 'Token sudah kedaluwarsa'
+                }
+            }
+
             const memberVoucher = new MemberVoucher()
-            memberVoucher.member_id = confirmation.member_id
-            memberVoucher.voucher_id = confirmation.voucher_id
+            memberVoucher.member_id = lockedConfirmation.member_id
+            memberVoucher.voucher_id = lockedConfirmation.voucher_id
             memberVoucher.voucher_code = uuid.v4()
             memberVoucher.expire_date = moment().add(voucher.duration, 'days').format('YYYY-MM-DD HH:mm:ss')
             VoucherSnapshot.applyToMemberVoucher(memberVoucher, voucher)
-            await memberVoucher.save()
+            await memberVoucher.save(trx)
 
-            confirmation.status = 'confirmed'
-            confirmation.confirmed_at = moment().format('YYYY-MM-DD HH:mm:ss')
-            confirmation.member_voucher_id = memberVoucher.member_voucher_id
-            await confirmation.save()
+            lockedConfirmation.status = 'confirmed'
+            lockedConfirmation.confirmed_at = moment().format('YYYY-MM-DD HH:mm:ss')
+            lockedConfirmation.member_voucher_id = memberVoucher.member_voucher_id
+            await lockedConfirmation.save(trx)
+            await trx.commit()
 
             return {
                 status: true,
@@ -291,6 +323,7 @@ class VoucherRedeemConfirmationService {
             }
         } catch (error) {
             console.log(error)
+            await trx.rollback()
             await this.releaseHold(confirmation, 'cancelled')
             return {
                 status: false,

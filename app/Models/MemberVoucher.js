@@ -34,6 +34,10 @@ class MemberVoucher extends Model {
     voucher() {
         return this.belongsTo('App/Models/Voucher','voucher_id','voucher_id')
     }
+
+    partner() {
+        return this.belongsTo('App/Models/Partner','partner_id','partner_id')
+    }
 }
 
 module.exports = MemberVoucher

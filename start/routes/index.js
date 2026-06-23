@@ -13,6 +13,7 @@ require('./merchant')
 require('./get_point')
 require('./redeem_merchant')
 require('./member')
+require('./report')
 
 if(Env.get('NODE_ENV')==='development'){
     require('./test')

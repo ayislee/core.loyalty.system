@@ -633,6 +633,7 @@ class TransactionController {
         }
 
         try {
+            const clientRequestId = normalizeText(req.client_request_id || req.checkout_id)
             const params = {
                 item: req.item,
                 store_id: req.store_id,
@@ -653,6 +654,10 @@ class TransactionController {
                 shipping_service: req.shipping_service,
                 pickup_date: req.pickup_date,
                 transaction_url_referer: Env.get('APP_URL')
+            }
+            if(clientRequestId){
+                params.client_request_id = clientRequestId
+                params.checkout_id = clientRequestId
             }
             if(transactionDeliveryNote){
                 params.transaction_delivery_note = transactionDeliveryNote

@@ -28,6 +28,8 @@ class VoucherSnapshot {
         const redeemedPoint = toPositiveNumber(voucher ? voucher.number_point : null)
 
         const payload = {
+            partner_id: voucher && voucher.partner_id ? voucher.partner_id : null,
+            voucher_name_snapshot: voucher && voucher.name ? voucher.name : null,
             voucher_type: voucherType,
             discount_calculation_type: null,
             discount_value: null,
@@ -67,6 +69,8 @@ class VoucherSnapshot {
         const payload = this.toMemberVoucherPayload(voucher)
 
         memberVoucher.voucher_type = payload.voucher_type
+        memberVoucher.partner_id = payload.partner_id
+        memberVoucher.voucher_name_snapshot = payload.voucher_name_snapshot
         memberVoucher.discount_calculation_type = payload.discount_calculation_type
         memberVoucher.discount_value = payload.discount_value
         memberVoucher.redeemed_point = payload.redeemed_point

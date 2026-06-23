@@ -47,6 +47,7 @@ Event.on('sendpoint::member', async (data) => {
         pH.ref_id = uuid.v4()
         pH.desc = `${data.description} [${partner.name}]`
         pH.partner_id = data.partner_id
+        pH.source_type = Number(data.point) > 0 ? 'partner_award' : 'partner_adjustment'
         await pH.save(trx)
 
         
@@ -134,6 +135,8 @@ Event.on('redeem::member', async (data) => {
         pH.ref_id = uuid.v4()
         pH.point = 0 - data.voucher.number_point 
         pH.desc = `Redeem ${data.voucher.name}`
+        pH.partner_id = data.voucher.partner_id || null
+        pH.source_type = 'voucher_redeem_legacy'
         await pH.save(trx)
 
         const mVoucher = new MemberVoucher()
