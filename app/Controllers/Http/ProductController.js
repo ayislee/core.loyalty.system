@@ -6,7 +6,82 @@ const ProductReviewEligibility = use('App/Helpers/ProductReviewEligibility')
 const Database = use('Database')
 const axios = use('axios')
 const Env = use('Env')
+
+const PRODUCT_SEARCH_KEYS = [
+    'item_name',
+    'item_sku',
+    'item_slug',
+    'slug',
+    'menu_name',
+    'menu_sku',
+    'menu_slug',
+    'category_display_name',
+    'category_name',
+    'store_name',
+    'company_name',
+    'item_description',
+    'description'
+]
+
 class ProductController {
+    _normalizeKeyword(value) {
+        const keyword = `${value || ''}`.trim().toLowerCase()
+        return keyword.length > 0 ? keyword : null
+    }
+
+    _collectSearchValues(data, values = []) {
+        if (!data) return values
+
+        if (Array.isArray(data)) {
+            data.forEach((item) => this._collectSearchValues(item, values))
+            return values
+        }
+
+        if (typeof data !== 'object') return values
+
+        Object.entries(data).forEach(([key, value]) => {
+            if (value === null || value === undefined) return
+
+            if (PRODUCT_SEARCH_KEYS.includes(`${key}`) && typeof value !== 'object') {
+                values.push(`${value}`)
+                return
+            }
+
+            if (typeof value === 'object') {
+                this._collectSearchValues(value, values)
+            }
+        })
+
+        return values
+    }
+
+    _productMatchesKeyword(item, keyword) {
+        if (!keyword) return true
+        return this._collectSearchValues(item)
+            .join(' ')
+            .toLowerCase()
+            .includes(keyword)
+    }
+
+    _filterProductList(items, keyword) {
+        if (!keyword || !Array.isArray(items)) return items
+        return items.filter((item) => this._productMatchesKeyword(item, keyword))
+    }
+
+    _filterProductPayload(payload, keyword) {
+        if (!keyword) return payload
+        if (Array.isArray(payload)) return this._filterProductList(payload, keyword)
+
+        if (payload && typeof payload === 'object' && Array.isArray(payload.data)) {
+            return {
+                ...payload,
+                data: this._filterProductList(payload.data, keyword)
+            }
+        }
+
+        return payload
+    }
+
     async store_get({request, response, auth}) {
         const partner = await Partner.query().where('partner_id',auth.user.default_partner_id).first()
         console.log(partner)
@@ -250,10 +325,11 @@ class ProductController {
     }
 
     async publicProduct({ request, response }) {
-        const { store_slug, company_slug, item_id, item_slug, category_display_id, category_displat_id } = request.get()
+        const { store_slug, company_slug, item_id, item_slug, category_display_id, category_displat_id, keyword } = request.get()
         const defaultCompanySlug = Env.get('DEFAULT_COMPANY_SLUG')
         let activeStoreSlug = store_slug
         const activeCategoryDisplayId = category_display_id || category_displat_id
+        const activeKeyword = this._normalizeKeyword(keyword)
         const params = {}
 
         if (item_id) {
@@ -266,6 +342,10 @@ class ProductController {
 
         if (activeCategoryDisplayId) {
             params.category_display_id = activeCategoryDisplayId
+        }
+
+        if (activeKeyword) {
+            params.keyword = activeKeyword
         }
 
         try {
@@ -289,7 +369,7 @@ class ProductController {
                 }
 
                 return response.json(
-                    storeRes?.data
+                    this._filterProductPayload(storeRes?.data, activeKeyword)
                 )
                 // const firstStore = storeRes?.data?.data?.[0]
                 // if (!firstStore?.store_slug) {
@@ -314,7 +394,7 @@ class ProductController {
 
             return response.json({
                 status: true,
-                data: res?.data?.data
+                data: this._filterProductList(res?.data?.data, activeKeyword)
             })
         } catch (error) {
             console.log(error)
