@@ -126,6 +126,10 @@ Member perlu alur belanja yang sederhana dari lihat produk sampai checkout. Saat
 4. Observability: log error harus cukup untuk tracing kegagalan call ke marketplace core.
 5. Performa: target p95 endpoint member <= 3 detik pada kondisi normal dependency.
 
+## Marketplace single-store fulfillment
+
+Delivery marketplace bersifat store-agnostic: satu checkout menghasilkan satu toko internal dan satu ongkir. Core memilih toko secara server-side berdasarkan stok penuh dan jarak GoSend, kemudian klien menggunakan quote token pada endpoint checkout baru tanpa menerima identitas toko.
+
 ## 13. Risiko dan Technical Debt Saat Ini
 1. `GET /api/v1/member/transaction/get` belum terimplementasi.
 2. `CartController.get/edit/delete` belum memverifikasi kepemilikan `member_id` pada object `cart`.

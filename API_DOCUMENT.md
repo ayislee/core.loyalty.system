@@ -1004,6 +1004,14 @@ atau
 Prefix: `/api/v1/member`
 Middleware group: `auth:phone`, `auth:email`
 
+### POST `/api/v1/member/checkout/quote`
+- Body: `selected_cart_ids` (array), `address_id` (integer), optional `ms_payment_id`, `ms_delivery_id`, `shipping_service`, `voucher_code`, and `client_request_id`.
+- Core memilih satu toko internal memakai koordinat alamat, jarak GoSend, dan stok seluruh cart. Response berisi `quote_token` singkat, preview aman, pilihan pengiriman/pembayaran, dan total tanpa identitas toko.
+
+### POST `/api/v1/member/checkout/commit`
+- Body: `quote_token` dan optional `client_request_id`.
+- Core memverifikasi token dan mengulang validasi alamat, jarak GoSend, serta stok sebelum membuat tepat satu order. Kode error utama: `QUOTE_EXPIRED`, `FULFILLMENT_CHANGED`, dan `MARKETPLACE_ORDER_FAILED`.
+
 ### GET `/api/v1/member/profile`
 - Controller: `MemberController.profile`
 - Response:

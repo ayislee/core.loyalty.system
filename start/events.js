@@ -15,6 +15,8 @@ const Env = use('Env')
 const SMSAPI = use('App/Lib/SMSAPI')
 const WhatsappAPI = use('App/Lib/WhatsappAPI')
 const Email = use('App/Lib/Email')
+const sentLoginTokens = global.__sentLoginTokens || new Map()
+global.__sentLoginTokens = sentLoginTokens
 
 
 Event.on('new::member', async (member) => {
@@ -88,7 +90,15 @@ Event.on('sendpoint::member', async (data) => {
 
 
 Event.on('token::member', async (data) => {
-    console.log(data)
+    const tokenKey = `${data?.member?.member_id || data?.member?.phone || data?.member?.email}:${data?.token}`
+    const sentAt = sentLoginTokens.get(tokenKey)
+    if (sentAt && Date.now() - sentAt < 5 * 60 * 1000) {
+        console.log(`[token::member] duplicate suppressed pid=${process.pid} key=${tokenKey}`)
+        return
+    }
+    sentLoginTokens.set(tokenKey, Date.now())
+
+    console.log(`[token::member] sending pid=${process.pid} key=${tokenKey}`)
     const message = `SANGAT RAHASIA! Jangan di informasikan ke pihak lain, token akses anda adalah ${data.token}, berlaku 5 menit`
     console.log(message)
     data.message = message

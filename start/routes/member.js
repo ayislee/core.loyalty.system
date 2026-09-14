@@ -30,11 +30,14 @@ Route.group(()=>{
     Route.get('/product/get','ProductController.get')
     Route.post('/product/review','ProductController.createReview')
     
-    Route.get('/cart','CartController.list').validator('Pages')
+    Route.get('/cart','CartController.list')
     Route.get('/cart/get','CartController.get').validator('CartID')
     Route.post('/cart','CartController.create')
     Route.put('/cart','CartController.edit').validator('CartID')
     Route.delete('/cart','CartController.delete').validator('CartID')
+
+    Route.post('/checkout/quote', 'CheckoutController.quote').validator('CheckoutQuote')
+    Route.post('/checkout/commit', 'CheckoutController.commit').validator('CheckoutCommit')
     
     Route.get('/transaction','TransactionController.list').validator('Pages')
     Route.get('/transaction/get','TransactionController.get')

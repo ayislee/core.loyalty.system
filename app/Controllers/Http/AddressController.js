@@ -80,7 +80,8 @@ class AddressController {
     async delete({request, response, auth}) {
         const req = request.all()
         try {
-            const address = await Address.query().where('address_id',req.address_id).first()
+            const address = await Address.query().where('address_id',req.address_id).where('member_id', auth.user.member_id).first()
+            if (!address) return response.status(404).json({ status: false, message: 'address not found' })
             await address.delete()
             return response.json({
                 status: true,

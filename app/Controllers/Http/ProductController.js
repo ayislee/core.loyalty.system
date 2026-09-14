@@ -24,6 +24,60 @@ const PRODUCT_SEARCH_KEYS = [
 ]
 
 class ProductController {
+    _aggregateProductAvailability (product) {
+        if (!product || typeof product !== 'object' || Array.isArray(product)) return product
+        const menus = Array.isArray(product.menu) ? product.menu : []
+        if (!menus.length) return product
+
+        const activeMenus = menus.filter((menu) => {
+            const status = menu?.store?.store_active_status ?? menu?.store?.store_active_status_name
+            return status === undefined || status === null || status === 1 || status === '1' || `${status}`.toLowerCase() === 'active'
+        })
+        const eligibleMenus = activeMenus.length ? activeMenus : menus
+        const aggregateStock = eligibleMenus.reduce(
+            (highest, menu) => Math.max(highest, Number(menu?.menu_current_quantity) || 0),
+            0
+        )
+        const representative = eligibleMenus
+            .slice()
+            .sort((a, b) => (Number(b?.menu_current_quantity) || 0) - (Number(a?.menu_current_quantity) || 0))[0]
+        const internalPlatform = (representative?.menu_platform || []).find(
+            (platform) => platform?.ms_merchant_payment?.ms_merchant_payment_identifier === 'INTERNAL_MARKETPLACE'
+        )
+        const currentPrice = Number(internalPlatform?.menu_platform_discount_price) ||
+            Number(internalPlatform?.menu_platform_regular_price) ||
+            Number(representative?.menu_discount_price) ||
+            Number(representative?.menu_regular_price) ||
+            Number(product.item_discount_price) || Number(product.item_regular_price) || 0
+
+        return {
+            ...product,
+            menu_current_quantity: aggregateStock,
+            current_price: currentPrice,
+            available: aggregateStock > 0,
+            stock_status: aggregateStock > 0 ? 'available' : 'unavailable'
+        }
+    }
+
+    _aggregateProductPayload (payload) {
+        if (Array.isArray(payload)) return payload.map((item) => this._aggregateProductAvailability(item))
+        if (payload && typeof payload === 'object' && Array.isArray(payload.data)) {
+            return { ...payload, data: payload.data.map((item) => this._aggregateProductAvailability(item)) }
+        }
+        return this._aggregateProductAvailability(payload)
+    }
+
+    _sanitizeMarketplaceProduct (value) {
+        if (Array.isArray(value)) return value.map((item) => this._sanitizeMarketplaceProduct(item))
+        if (!value || typeof value !== 'object') return value
+        return Object.entries(value).reduce((result, [key, item]) => {
+            // Product endpoints must never turn internal store inventory into
+            // customer-visible fulfillment information.
+            if (/^(store|stores|store_id|store_slug|store_name|store_address|store_coordinate|menu)$/i.test(key)) return result
+            result[key] = this._sanitizeMarketplaceProduct(item)
+            return result
+        }, {})
+    }
     _normalizeKeyword(value) {
         const keyword = `${value || ''}`.trim().toLowerCase()
         return keyword.length > 0 ? keyword : null
@@ -368,9 +422,9 @@ class ProductController {
                     })
                 }
 
-                return response.json(
+                return response.json(this._sanitizeMarketplaceProduct(this._aggregateProductPayload(
                     this._filterProductPayload(storeRes?.data, activeKeyword)
-                )
+                )))
                 // const firstStore = storeRes?.data?.data?.[0]
                 // if (!firstStore?.store_slug) {
                 //     return response.json({
@@ -394,7 +448,7 @@ class ProductController {
 
             return response.json({
                 status: true,
-                data: this._filterProductList(res?.data?.data, activeKeyword)
+                data: this._sanitizeMarketplaceProduct(this._aggregateProductPayload(this._filterProductList(res?.data?.data, activeKeyword)))
             })
         } catch (error) {
             console.log(error)
@@ -419,14 +473,20 @@ class ProductController {
         try {
             const api = `${Env.get('MARKETPLACE_CORE')}menu/slug/${slug}`
             const res = await axios.get(api)
-            if (res?.data?.error) {
-                return response.json({
-                    status: false,
-                    message: res.data.error
+            let productData = res?.data?.data
+            if (res?.data?.error || !productData) {
+                const companySlug = req.company_slug || Env.get('DEFAULT_COMPANY_SLUG')
+                const itemResponse = await axios.get(`${Env.get('MARKETPLACE_CORE')}company/slug/${companySlug}/item`, {
+                    params: { item_slug: slug }
                 })
+                productData = Array.isArray(itemResponse?.data?.data)
+                    ? itemResponse.data.data[0]
+                    : itemResponse?.data?.data
             }
-
-            const productData = res?.data?.data
+            if (!productData) {
+                return response.status(404).json({ status: false, message: 'Produk tidak ditemukan' })
+            }
+            productData = this._aggregateProductAvailability(productData)
 
             // Tambahkan agregasi review
             const agg = await Database
@@ -439,7 +499,7 @@ class ProductController {
             return response.json({
                 status: true,
                 data: {
-                    ...productData,
+                    ...this._sanitizeMarketplaceProduct(productData),
                     review_summary: {
                         average: agg && agg.avg_rating ? Number(agg.avg_rating) : 0,
                         total: agg && agg.total ? Number(agg.total) : 0
