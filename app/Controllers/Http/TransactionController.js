@@ -9,6 +9,7 @@ const ProductReviewEligibility = use('App/Helpers/ProductReviewEligibility')
 const qs = use('qs')
 const moment = use('moment')
 const CryptoJS = require('crypto-js')
+const crypto = require('crypto')
 
 const parseJson = (value) => {
     if (!value) return null
@@ -709,14 +710,29 @@ class TransactionController {
         const req = request.all()
         
         try {
-            const params = req
             const api = `${Env.get('MARKETPLACE_CORE')}transaction/retail/resume`
-            // return api
-            const res = await axios.put(api,req)
-            // return response.json(res.data)
+            const secret = Env.get('MARKETPLACE_CORE_SIGNATURE_SECRET')
+            if (!secret) {
+                return response.status(502).json({
+                    status: false,
+                    code: 'MARKETPLACE_CORE_SIGNATURE_NOT_CONFIGURED',
+                    message: 'Konfigurasi koneksi payment gateway marketplace belum lengkap.'
+                })
+            }
+
+            const timestamp = `${Math.floor(Date.now() / 1000)}`
+            const path = new URL(api).pathname
+            const bodyHash = crypto.createHash('sha256').update(JSON.stringify(req || {})).digest('hex')
+            const signaturePayload = `PUT\n${path}\n${timestamp}\n${bodyHash}`
+            const res = await axios.put(api, req, {
+                headers: {
+                    'x-marketplace-source': 'CORE_LOYALTY',
+                    'x-marketplace-timestamp': timestamp,
+                    'x-marketplace-signature': crypto.createHmac('sha256', secret).update(signaturePayload).digest('hex')
+                }
+            })
 
             if(res.data.success){
-                // return res.data
                 return response.json({
                     status: true,
                     data: res.data
@@ -729,9 +745,11 @@ class TransactionController {
             }
 
         } catch (error) {
-            response.data({
+            const upstream = error?.response?.data || {}
+            return response.status(Number(error?.response?.status) || 502).json({
                 status: false,
-                message: error.message
+                code: upstream.code || upstream.error || 'MARKETPLACE_UPSTREAM_ERROR',
+                message: upstream.message || upstream.error || error.message
             })
         }
     }

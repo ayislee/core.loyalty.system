@@ -63,8 +63,6 @@ Route.group(()=>{
 
     Route.get('/shipping/cost','ShippingController.get')
 
-    Route.get('/master/payment','MasterController.payment')
-    
     Route.get('/auth','MemberController.auth')
     
 }).prefix(prefix).middleware(['auth:phone','auth:email'])

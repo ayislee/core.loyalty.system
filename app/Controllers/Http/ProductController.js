@@ -6,6 +6,7 @@ const ProductReviewEligibility = use('App/Helpers/ProductReviewEligibility')
 const Database = use('Database')
 const axios = use('axios')
 const Env = use('Env')
+const CompanyPaymentGatewayService = use('App/Services/CompanyPaymentGatewayService')
 
 const PRODUCT_SEARCH_KEYS = [
     'item_name',
@@ -139,6 +140,13 @@ class ProductController {
     async store_get({request, response, auth}) {
         const partner = await Partner.query().where('partner_id',auth.user.default_partner_id).first()
         console.log(partner)
+        if (!partner || !partner.company_slug) {
+            return response.status(404).json({
+                status: false,
+                code: 'PARTNER_NOT_FOUND',
+                message: 'Partner default member tidak ditemukan.'
+            })
+        }
         
         const api = `${Env.get('MARKETPLACE_CORE')}store/slug/${partner.store_slug}`
         try {
@@ -151,9 +159,14 @@ class ProductController {
                 })
             }
 
+            const upstreamData = res.data
+            const storeData = upstreamData && upstreamData.data
+            const normalizedData = storeData && !Array.isArray(storeData) && storeData.company
+                ? { ...upstreamData, data: CompanyPaymentGatewayService.attachToStores([storeData])[0] }
+                : upstreamData
             return response.json({
                 status: true,
-                data: res.data
+                data: normalizedData
 
             })   
         } catch (error) {
@@ -172,7 +185,21 @@ class ProductController {
         .where('member_id',auth.user.member_id)
         .where('partner_id',req.partner_id)
         .with('partner').first()
+        if (!memberPartner) {
+            return response.status(404).json({
+                status: false,
+                code: 'PARTNER_NOT_FOUND',
+                message: 'Partner member tidak ditemukan.'
+            })
+        }
         const mp = memberPartner.toJSON()
+        if (!mp.partner || !mp.partner.company_slug) {
+            return response.status(422).json({
+                status: false,
+                code: 'PAYMENT_GATEWAY_UNAVAILABLE',
+                message: 'Company partner belum dikonfigurasi.'
+            })
+        }
         const company_slug = mp.partner.company_slug
         console.log(company_slug)
         const api = `${Env.get('MARKETPLACE_CORE')}company/slug/${company_slug}/store`
@@ -188,7 +215,7 @@ class ProductController {
 
             return response.json({
                 status: true,
-                data: res.data.data
+                data: CompanyPaymentGatewayService.attachToStores(res.data.data)
 
             })   
         } catch (error) {

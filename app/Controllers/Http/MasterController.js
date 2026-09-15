@@ -1,6 +1,7 @@
 'use strict'
 const axios = use('axios')
 const Env = use('Env')
+const CompanyPaymentGatewayService = use('App/Services/CompanyPaymentGatewayService')
 
 class MasterController {
     async province({request, response}){
@@ -50,34 +51,27 @@ class MasterController {
         }
     }
 
-    async payment({response}) {
+    async payment({request, response, auth}) {
         try {
-            const res = await axios.get(Env.get('MARKETPLACE_CORE')+`list/ms_payment`, {
-                params: {
-                    ms_payment_identifier: 'MIDTRANS'
-                }
+            const gateway = await CompanyPaymentGatewayService.resolveForMember({
+                member: auth.user,
+                partnerId: request.input('partner_id') || null
             })
-            // console.log(res.data)
-            if(res.data.success){
-                const paymentList = Array.isArray(res.data.data) ? res.data.data : []
-                const midtransPayment = paymentList.filter((payment) =>
-                    `${payment?.ms_payment_identifier || ''}`.trim().toUpperCase() === 'MIDTRANS'
-                )
-
-                return response.json({
-                    status: true,   
-                    data: midtransPayment
-                })
-            }else{
-                return response.json({
-                    status: false,
-                    message: res.data.error
-                })
-            }
-        } catch (error) {
             return response.json({
+                status: true,
+                data: [{
+                    ms_payment_id: gateway.ms_payment_id,
+                    ms_payment_name: gateway.ms_payment_name,
+                    ms_payment_identifier: gateway.identifier,
+                    configuration_source: gateway.configuration_source,
+                    public_configuration: gateway.public_configuration
+                }]
+            })
+        } catch (error) {
+            return response.status(error.status || 502).json({
                 status: false,
-                message: error.message
+                code: error.code || 'MARKETPLACE_UPSTREAM_ERROR',
+                message: error.message || 'Gagal membaca payment gateway.'
             })
         }
     }
