@@ -125,6 +125,7 @@ class MarketplaceFulfillmentService {
         if (!stores.length) throw new FulfillmentError('NO_STORE_WITHIN_RADIUS', 'Tidak ada toko yang dapat melayani alamat ini.')
         let distanceUnavailable = 0
         let upstreamFailures = 0
+        const distanceExceeded = []
         const candidates = []
         for (const store of stores) {
             if (!this.isActiveStore(store)) continue
@@ -140,7 +141,15 @@ class MarketplaceFulfillmentService {
             const distance = await this.getGoSendDistance(coordinate, addressCoordinate, paymentType)
             if (distance.upstreamFailed) { upstreamFailures += 1; continue }
             if (distance.distanceKm === null) { distanceUnavailable += 1; continue }
-            if (distance.distanceKm > this.maxDistanceKm) continue
+            if (distance.distanceKm > this.maxDistanceKm) {
+                distanceExceeded.push({
+                    store_id: storeId,
+                    store_name: this.value(store, ['store_name', 'name']) || slug,
+                    distance_km: distance.distanceKm,
+                    maximum_distance_km: this.maxDistanceKm
+                })
+                continue
+            }
             const menu = await this.getStoreMenu(slug)
             const unavailable = carts.map((cart) => {
                 const item = this.menuForCart(menu, cart)
@@ -161,7 +170,16 @@ class MarketplaceFulfillmentService {
         if (!candidates.length) {
             if (upstreamFailures && upstreamFailures === stores.length) throw new FulfillmentError('MARKETPLACE_UPSTREAM_ERROR', 'Gagal menghitung jarak pengiriman.', 502)
             if (distanceUnavailable && distanceUnavailable + upstreamFailures === stores.length) throw new FulfillmentError('GOSEND_DISTANCE_UNAVAILABLE', 'Jarak pengiriman belum tersedia untuk alamat ini.')
-            throw new FulfillmentError('NO_SINGLE_STORE_CAN_FULFILL_CART', 'Tidak ada satu toko yang dapat memenuhi seluruh pesanan.', 422, { unavailable_items: carts.map((cart) => ({ cart_id: cart.cart_id, item_id: cart.item_id, item_name: cart.item_name, requested_quantity: Number(cart.quantity), reason: 'ITEM_NOT_AVAILABLE' })) })
+            if (distanceExceeded.length) {
+                const nearestStore = distanceExceeded.sort((a, b) => a.distance_km - b.distance_km)[0]
+                throw new FulfillmentError(
+                    'STORE_OUTSIDE_FULFILLMENT_RADIUS',
+                    `Toko ${nearestStore.store_name} berjarak ${nearestStore.distance_km} km, melebihi batas pengiriman ${nearestStore.maximum_distance_km} km.`,
+                    422,
+                    { reason: 'DISTANCE_EXCEEDS_LIMIT', distance_exceeded: distanceExceeded }
+                )
+            }
+            throw new FulfillmentError('NO_SINGLE_STORE_CAN_FULFILL_CART', 'Tidak ada satu toko yang dapat memenuhi seluruh pesanan karena stok item tidak tersedia di toko yang dapat melayani alamat ini.', 422, { reason: 'ITEM_NOT_AVAILABLE', unavailable_items: carts.map((cart) => ({ cart_id: cart.cart_id, item_id: cart.item_id, item_name: cart.item_name, requested_quantity: Number(cart.quantity), reason: 'ITEM_NOT_AVAILABLE' })) })
         }
         return candidates.sort((a, b) => a.distanceKm - b.distanceKm || b.stockRemaining - a.stockRemaining || `${a.storeId}`.localeCompare(`${b.storeId}`))[0]
     }

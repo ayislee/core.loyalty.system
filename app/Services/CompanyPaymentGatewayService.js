@@ -32,6 +32,8 @@ class CompanyPaymentGatewayService {
     publicGateway (gateway) {
         return {
             identifier: gateway.identifier,
+            ms_payment_id: gateway.ms_payment_id || null,
+            ms_payment_name: gateway.ms_payment_name || null,
             configuration_source: gateway.configuration_source,
             configured: Boolean(gateway.configured),
             active: Boolean(gateway.active),
@@ -53,6 +55,8 @@ class CompanyPaymentGatewayService {
             }
             return this.publicGateway({
                 identifier: selectedIdentifier,
+                ms_payment_id: configuration.ms_payment_id || company.ms_payment_id,
+                ms_payment_name: configuration.ms_payment_name || company.ms_payment_name,
                 configuration_source: 'COMPANY',
                 configured: configuration.configured,
                 active: configuration.active,
@@ -130,11 +134,16 @@ class CompanyPaymentGatewayService {
         const stores = await this.storesForCompany(partner.company_slug)
         const company = stores.find((store) => store && store.company)?.company || null
         const gateway = this.resolveFromCompany(company)
-        const payment = await this.masterPayment(gateway.identifier)
+        // New marketplace responses carry the selected payment master data in
+        // `company`, so the payment selection needs no second HTTP request.
+        // Keep the lookup only for legacy company responses during rollout.
+        const payment = gateway.ms_payment_id
+            ? null
+            : await this.masterPayment(gateway.identifier)
         return {
             ...gateway,
-            ms_payment_id: payment.ms_payment_id,
-            ms_payment_name: payment.ms_payment_name,
+            ms_payment_id: gateway.ms_payment_id || payment.ms_payment_id,
+            ms_payment_name: gateway.ms_payment_name || payment.ms_payment_name,
             company_id: company.company_id || null,
             company_slug: company.company_slug || partner.company_slug,
             partner_id: partner.partner_id
