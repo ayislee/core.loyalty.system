@@ -78,6 +78,7 @@ Route.group(()=>{
 
 const prefix_dashboard = '/api/v1/admin/dashboard'
 Route.group(() => {
+    Route.get('/overview', 'DashboardController.overview')
     Route.get('/stats', 'DashboardController.stats')
     Route.get('/recent-members', 'DashboardController.recentMembers')
     Route.get('/point-history', 'DashboardController.pointHistory')

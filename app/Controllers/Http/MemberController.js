@@ -338,7 +338,7 @@ class MemberController {
 
     async profile({request, response, auth}){
 
-        const data = await Member.query()
+        const data = Member.query()
         .where('member_id',auth.user.member_id)
         .with('point')
         .with('member_voucher',(build)=>{
@@ -866,7 +866,7 @@ class MemberController {
         .filter(request.all().filter)
         .order(request.all().order)
         .orderBy('point_history_id','desc')
-        .paginate(request.all().page, request.all().rows)
+        const out = await data.paginate(request.all().page, request.all().rows)
 
         return response.json({
             status: true,
@@ -1037,14 +1037,27 @@ class MemberController {
 
     // Admin Member
     async gets({request, response, auth}) {
-        const data = await Member.query()
-        .filter(request.all().filter)
-        .order(request.all().filter)
-        .paginate(request.all().page, request.all().rows)
+        const sortBy = request.input('sort_by') === 'total_point' ? 'total_point' : 'created_at'
+        const sortDirection = `${request.input('sort_direction') || 'DESC'}`.toUpperCase() === 'ASC' ? 'ASC' : 'DESC'
+        const data = Member.query()
+            .leftJoin('points', function () {
+                this.on('points.member_id', '=', 'members.member_id')
+                    .onNull('points.deleted_at')
+            })
+            .select('members.*', Database.raw('COALESCE(points.point, 0) as total_point'))
+            .filter(request.all().filter)
 
+        if (sortBy === 'total_point') {
+            data.orderByRaw(`COALESCE(points.point, 0) ${sortDirection}`)
+                .orderBy('members.created_at', 'desc')
+        } else {
+            data.orderBy('members.created_at', sortDirection)
+        }
+
+        const out = await data.paginate(request.all().page, request.all().rows)
         return response.json({
             status: true,
-            data : data
+            data : out
         })
     }
 

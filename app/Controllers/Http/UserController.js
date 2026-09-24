@@ -201,6 +201,20 @@ class UserController {
 
     }
 
+    async resetPassword({request, response}) {
+        const user = await User.query()
+        .where('user_id', request.all().user_id)
+        .first()
+
+        user.password = request.all().password
+        await user.save()
+
+        return response.json({
+            status: true,
+            message: 'Password berhasil direset'
+        })
+    }
+
     async create_user_partner({request, response, auth}) {
         let userPartner
         userPartner = await UserPartner.query().where('user_id',request.all().user_id).first()
