@@ -338,7 +338,7 @@ class MemberController {
 
     async profile({request, response, auth}){
 
-        const data = Member.query()
+        const data = await Member.query()
         .where('member_id',auth.user.member_id)
         .with('point')
         .with('member_voucher',(build)=>{
@@ -348,6 +348,13 @@ class MemberController {
             .where('expire_date','>',moment().format('YYYY-MM-DD HH:mm:ss'))
         })
         .first()
+
+        if (!data) {
+            return response.status(404).json({
+                status: false,
+                message: 'member not found'
+            })
+        }
 
         const emailCooldown = await this.findActiveContactVerification(auth.user.member_id, 'email')
         const phoneCooldown = await this.findActiveContactVerification(auth.user.member_id, 'phone')
