@@ -152,7 +152,8 @@ class MemberController {
         const partner = await Partner.query().where('partner_id', auth.user.default_partner_id).first()
         auth.user.partner = {
             primary_color: partner.primary_color,
-            primary_color_hover: partner.primary_color_hover
+            primary_color_hover: partner.primary_color_hover,
+            logo: partner.logo
         }
         return response.json({
             status: true,

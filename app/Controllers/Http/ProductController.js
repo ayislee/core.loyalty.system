@@ -79,6 +79,36 @@ class ProductController {
             return result
         }, {})
     }
+    _paginateProductList (items, pageValue, rowsValue) {
+        const page = Math.max(1, Number.parseInt(pageValue, 10) || 1)
+        const rows = Math.min(100, Math.max(1, Number.parseInt(rowsValue, 10) || 15))
+        const data = Array.isArray(items) ? items : []
+        const total = data.length
+        const lastPage = Math.max(1, Math.ceil(total / rows))
+        const currentPage = Math.min(page, lastPage)
+        const offset = (currentPage - 1) * rows
+
+        return {
+            data: data.slice(offset, offset + rows),
+            page: currentPage,
+            last_page: lastPage,
+            total
+        }
+    }
+    _resolveProductPagination (items, source, pageValue, rowsValue) {
+        const remoteLastPage = Number(source?.last_page || source?.lastPage || source?.meta?.last_page)
+
+        if (Number.isFinite(remoteLastPage) && remoteLastPage > 0) {
+            return {
+                data: Array.isArray(items) ? items : [],
+                page: Math.max(1, Number(source?.page || source?.current_page || source?.meta?.current_page) || 1),
+                last_page: Math.max(1, remoteLastPage),
+                total: Number(source?.total || source?.meta?.total) || 0
+            }
+        }
+
+        return this._paginateProductList(items, pageValue, rowsValue)
+    }
     _normalizeKeyword(value) {
         const keyword = `${value || ''}`.trim().toLowerCase()
         return keyword.length > 0 ? keyword : null
@@ -406,7 +436,7 @@ class ProductController {
     }
 
     async publicProduct({ request, response }) {
-        const { store_slug, company_slug, item_id, item_slug, category_display_id, category_displat_id, keyword } = request.get()
+        const { store_slug, company_slug, item_id, item_slug, category_display_id, category_displat_id, keyword, page, rows } = request.get()
         const defaultCompanySlug = Env.get('DEFAULT_COMPANY_SLUG')
         let activeStoreSlug = store_slug
         const activeCategoryDisplayId = category_display_id || category_displat_id
@@ -429,6 +459,9 @@ class ProductController {
             params.keyword = activeKeyword
         }
 
+        if (page) params.page = page
+        if (rows) params.rows = rows
+
         try {
             if (!activeStoreSlug) {
                 const activeCompanySlug = company_slug || defaultCompanySlug
@@ -449,9 +482,18 @@ class ProductController {
                     })
                 }
 
-                return response.json(this._sanitizeMarketplaceProduct(this._aggregateProductPayload(
+                const productPayload = this._sanitizeMarketplaceProduct(this._aggregateProductPayload(
                     this._filterProductPayload(storeRes?.data, activeKeyword)
-                )))
+                ))
+                const productItems = Array.isArray(productPayload)
+                    ? productPayload
+                    : productPayload?.data
+                const pagination = this._resolveProductPagination(productItems, productPayload, page, rows)
+
+                return response.json({
+                    status: productPayload?.status !== false,
+                    ...pagination
+                })
                 // const firstStore = storeRes?.data?.data?.[0]
                 // if (!firstStore?.store_slug) {
                 //     return response.json({
@@ -473,9 +515,14 @@ class ProductController {
                 })
             }
 
+            const productItems = this._sanitizeMarketplaceProduct(this._aggregateProductPayload(
+                this._filterProductList(res?.data?.data, activeKeyword)
+            ))
+            const pagination = this._resolveProductPagination(productItems, res?.data, page, rows)
+
             return response.json({
                 status: true,
-                data: this._sanitizeMarketplaceProduct(this._aggregateProductPayload(this._filterProductList(res?.data?.data, activeKeyword)))
+                ...pagination
             })
         } catch (error) {
             console.log(error)

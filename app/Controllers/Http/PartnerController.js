@@ -3,10 +3,31 @@ const Partner = use('App/Models/Partner')
 const Userpartner = use('App/Models/UserPartner')
 const Database = use('Database')
 const Lib = use('App/Lib/LoyaltyLib')
+const Env = use('Env')
 var randomToken = require('random-token').create('abcdefghijklmnopqrstuvwxzyABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789');
 
 
 class PartnerController {
+    async publicBranding({request, response}) {
+        const partnerId = request.input('partner_id')
+        const companySlug = request.input('company_slug') || Env.get('DEFAULT_COMPANY_SLUG')
+        let partnerQuery = Partner.query().select('partner_id', 'name', 'logo', 'company_slug')
+
+        if (partnerId) {
+            partnerQuery = partnerQuery.where('partner_id', partnerId)
+        } else if (companySlug) {
+            partnerQuery = partnerQuery.where('company_slug', companySlug)
+        }
+
+        const partner = await partnerQuery.first()
+
+        return response.json({
+            status: Boolean(partner),
+            data: partner,
+            message: partner ? 'success' : 'Partner tidak ditemukan'
+        })
+    }
+
     async gets({request, response, auth}){
         let partner_id = null
         let partner

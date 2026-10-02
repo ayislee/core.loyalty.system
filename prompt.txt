@@ -1,4 +1,4 @@
-Buatkan issue.md yang berisi perencanaan untuk nanti di implementasikan oleh jonior programmer atau ai model yang lebih murah
+Buatkan issue-back-btn.md pada folder clent.loyalty.system yang berisi perencanaan untuk nanti di implementasikan oleh jonior programmer atau ai model yang lebih murah
 
 ** struktur folder:
 1. core.loyalty.system = backend loyalty / proxy
@@ -8,17 +8,15 @@ Buatkan issue.md yang berisi perencanaan untuk nanti di implementasikan oleh jon
 5. frontend-mediacartz = frontend marketplace untuk backend-mediacartz
 
 ** Informasi umum:
-Pada dasarnya fitur marketpalace di aplikasi loyalti ini adalah pengganti aplikasi mobile POS yang di gunakan di setiap toko, hanya saja channel nya menggunakan web e-commerce, karena toko berada di beberapa tempat yang berbeda diharapkan setiap pelanggan secara otomatis diarahkan ke toko yang terdekat dengan maksimal jarak yang sudah ditentukan. artinya apabila maksimal jaraknya antara lokasi toko dengan pelanggan adalah 3km, artinya pelanggan tidak boleh bertransaksi  dengan toko yang jaraknya lebih dari 3km.
+Notulensi hasil Meeting ada di file core.loyalty.system/dengan referensia file core.loyalty.system/NOTULENSI_EVALUASI_MARKETPLACE.md berisi rencana update ke depan.
 
 ** tujuan :
-pelanggan tidak perlu mengetahui ke toko mana dia bertransaksi, jadi di halaman keranjang hanya menampilkan barang apa saja yng akan mereka beli, tanpa menampilkan toko nya
+membuat issue berdasarkan file dengan referensia file core.loyalty.system/NOTULENSI_EVALUASI_MARKETPLACE.md:
+pembahasan ### 1. Tombol kembali dari halaman detail produk
 
 ** Permasalahan:
-masalah yang timbul adalah belum tentu stock yang ada di toko ada. jadi apabila pelanggan membeli lebih dari 1 item, dan ternyata salah satu barang ada di toko tertentu stick nya habis, system tidak boleh meng split order ke toko lain karena akan menimbulkan 2 atau lebih biaya pengiriman 
 
-
-planing nya adalah:
-1. pada client.loyalty.system halaman /product buatkan fitur search produk berikut sugestionnya 
-  
+** planing nya adalah:
+buatkan issue terkait  "1. Tombol kembali dari halaman detail produk" yang ada di   core.loyalty.system/NOTULENSI_EVALUASI_MARKETPLACE.md
 
 jangan buatkan terlalu detain instruksi unit test nya. buatkan saja skenario apa yang harus di test, biarkan yang mengimplementasi detail skenarionya adalah junior programer atau model ai yang lebih murah

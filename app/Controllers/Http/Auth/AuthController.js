@@ -327,7 +327,7 @@ class AuthController {
         } catch (error) {
             return response.json({
                 status: false,
-                message: 'invalid token'
+                message: 'Kode OTP tidak valid atau telah kedaluwarsa'
             })
         }
     }
