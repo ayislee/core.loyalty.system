@@ -7,7 +7,8 @@ const Env = use('Env')
 const prefix='/api/v1/public'
 
 Route.group(()=>{
-    Route.get('/banners','BannerController.public_get')
+    Route.get('/banners','PromoBannerController.public_get')
+    Route.get('/promo-banners','PromoBannerController.public_get')
     Route.get('/partner','PartnerController.publicBranding')
     Route.get('/store','ProductController.publicStore')
     Route.get('/category','ProductController.publicCategory')

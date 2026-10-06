@@ -7,6 +7,7 @@ const Database = use('Database')
 const axios = use('axios')
 const Env = use('Env')
 const CompanyPaymentGatewayService = use('App/Services/CompanyPaymentGatewayService')
+const MemberStoreService = use('App/Services/MemberStoreService')
 
 const PRODUCT_SEARCH_KEYS = [
     'item_name',
@@ -25,6 +26,26 @@ const PRODUCT_SEARCH_KEYS = [
 ]
 
 class ProductController {
+    _normalizeStoreList (payload) {
+        const data = payload?.data ?? payload
+        if (Array.isArray(data)) return data
+        if (Array.isArray(data?.data)) return data.data
+        return []
+    }
+
+    _extractMenuItems (payload) {
+        const data = payload?.data ?? payload
+        if (Array.isArray(data)) return data
+        if (Array.isArray(data?.menu)) return data.menu
+        if (data?.menu && typeof data.menu === 'object') {
+            return Object.values(data.menu).reduce((items, group) => (
+                items.concat(Array.isArray(group) ? group : [])
+            ), [])
+        }
+        if (Array.isArray(data?.data)) return data.data
+        return []
+    }
+
     _aggregateProductAvailability (product) {
         if (!product || typeof product !== 'object' || Array.isArray(product)) return product
         const menus = Array.isArray(product.menu) ? product.menu : []
@@ -153,6 +174,15 @@ class ProductController {
         return items.filter((item) => this._productMatchesKeyword(item, keyword))
     }
 
+    _filterProductIdentifiers(items, itemId, itemSlug) {
+        if (!Array.isArray(items) || (!itemId && !itemSlug)) return items
+        return items.filter((item) => {
+            if (itemId && `${item?.item_id}` === `${itemId}`) return true
+            if (itemSlug && [item?.item_slug, item?.slug, item?.menu_slug].some((value) => `${value || ''}` === `${itemSlug}`)) return true
+            return false
+        })
+    }
+
     _filterProductPayload(payload, keyword) {
         if (!keyword) return payload
         if (Array.isArray(payload)) return this._filterProductList(payload, keyword)
@@ -258,14 +288,14 @@ class ProductController {
     }
 
     async list({request, response, auth}) {
-        const req = request.all()
-        // return response.json(auth.user)
-
-        const partner = await Partner.query().where("partner_id", auth.user.default_partner_id).first()
-        const api = `${Env.get('MARKETPLACE_CORE')}store/slug/${partner.store_slug}/menu`
-        
         try {
-            const res = await axios.get(api)
+            const resolved = await MemberStoreService.resolve(auth.user.default_store_slug)
+            // Repair a removed/invalid saved preference while serving the safe default.
+            if (auth.user.default_store_slug !== resolved.storeSlug) {
+                auth.user.default_store_slug = resolved.storeSlug
+                await auth.user.save()
+            }
+            const res = await axios.get(`${Env.get('MARKETPLACE_CORE')}store/slug/${resolved.storeSlug}/menu`, { params: request.all() })
             if(res.data.error){
                 console.log(res.data.error)
                 return response.json({
@@ -278,7 +308,9 @@ class ProductController {
             return response.json({
                 
                 status: true,
-                data: res.data.data
+                data: res.data.data,
+                store_slug: resolved.storeSlug,
+                store_name: resolved.store.store_name || resolved.store.name || resolved.storeSlug
 
             })   
         } catch (error) {
@@ -387,9 +419,16 @@ class ProductController {
                 ? (res?.data?.data || res?.data)
                 : res?.data?.data
 
+            const stores = this._normalizeStoreList(payload)
+            const defaultStore = await MemberStoreService.findBySlug(Env.get('DEFAULT_STORE_SLUG'), activeCompanySlug)
+            if (defaultStore && !stores.some((store) => `${store?.store_slug || store?.slug || ''}` === `${Env.get('DEFAULT_STORE_SLUG')}`)) {
+                stores.unshift(defaultStore)
+            }
             return response.json({
                 status: true,
-                data: payload
+                data: payload,
+                default_store_slug: Env.get('DEFAULT_STORE_SLUG'),
+                stores
             })
         } catch (error) {
             console.log(error)
@@ -438,7 +477,6 @@ class ProductController {
     async publicProduct({ request, response }) {
         const { store_slug, company_slug, item_id, item_slug, category_display_id, category_displat_id, keyword, page, rows } = request.get()
         const defaultCompanySlug = Env.get('DEFAULT_COMPANY_SLUG')
-        let activeStoreSlug = store_slug
         const activeCategoryDisplayId = category_display_id || category_displat_id
         const activeKeyword = this._normalizeKeyword(keyword)
         const params = {}
@@ -463,49 +501,11 @@ class ProductController {
         if (rows) params.rows = rows
 
         try {
-            if (!activeStoreSlug) {
-                const activeCompanySlug = company_slug || defaultCompanySlug
-                if (!activeCompanySlug) {
-                    return response.badRequest({
-                        status: false,
-                        message: 'store_slug or company_slug is required'
-                    })
-                }
-
-                const storeApi = `${Env.get('MARKETPLACE_CORE')}company/slug/${activeCompanySlug}/item`
-                const storeRes = await axios.get(storeApi, { params })
-
-                if (storeRes?.data?.error) {
-                    return response.json({
-                        status: false,
-                        message: storeRes.data.error
-                    })
-                }
-
-                const productPayload = this._sanitizeMarketplaceProduct(this._aggregateProductPayload(
-                    this._filterProductPayload(storeRes?.data, activeKeyword)
-                ))
-                const productItems = Array.isArray(productPayload)
-                    ? productPayload
-                    : productPayload?.data
-                const pagination = this._resolveProductPagination(productItems, productPayload, page, rows)
-
-                return response.json({
-                    status: productPayload?.status !== false,
-                    ...pagination
-                })
-                // const firstStore = storeRes?.data?.data?.[0]
-                // if (!firstStore?.store_slug) {
-                //     return response.json({
-                //         status: false,
-                //         message: 'Store tidak ditemukan'
-                //     })
-                // }
-                // activeStoreSlug = firstStore.store_slug
-
+            const resolved = await MemberStoreService.resolve(store_slug, company_slug || defaultCompanySlug)
+            if (store_slug && !resolved.isValid) {
+                return response.badRequest({ status: false, message: 'Toko tidak ditemukan' })
             }
-
-            const api = `${Env.get('MARKETPLACE_CORE')}store/slug/${activeStoreSlug}/menu`
+            const api = `${Env.get('MARKETPLACE_CORE')}store/slug/${resolved.storeSlug}/menu`
             const res = await axios.get(api, { params })
 
             if (res?.data?.error) {
@@ -515,13 +515,16 @@ class ProductController {
                 })
             }
 
+            const matchedItems = this._filterProductIdentifiers(this._extractMenuItems(res?.data), item_id, item_slug)
             const productItems = this._sanitizeMarketplaceProduct(this._aggregateProductPayload(
-                this._filterProductList(res?.data?.data, activeKeyword)
+                this._filterProductList(matchedItems, activeKeyword)
             ))
-            const pagination = this._resolveProductPagination(productItems, res?.data, page, rows)
+            const pagination = this._paginateProductList(productItems, page, rows)
 
             return response.json({
                 status: true,
+                store_slug: resolved.storeSlug,
+                store_name: resolved.store.store_name || resolved.store.name || resolved.storeSlug,
                 ...pagination
             })
         } catch (error) {

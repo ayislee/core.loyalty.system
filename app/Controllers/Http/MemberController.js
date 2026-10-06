@@ -463,6 +463,39 @@ class MemberController {
         })
     }
 
+    async update_default_store({ request, response, auth }) {
+        const storeSlug = `${request.input('store_slug') || ''}`.trim()
+        if (!storeSlug) {
+            return response.badRequest({ status: false, message: 'store_slug is required' })
+        }
+
+        try {
+            const MemberStoreService = use('App/Services/MemberStoreService')
+            const partner = auth.user.default_partner_id
+                ? await Partner.query().where('partner_id', auth.user.default_partner_id).first()
+                : null
+            const resolved = await MemberStoreService.resolve(storeSlug, partner?.company_slug)
+            if (!resolved.isValid) {
+                return response.badRequest({ status: false, message: 'Toko tidak ditemukan' })
+            }
+
+            const member = await Member.find(auth.user.member_id)
+            if (!member) return response.status(404).json({ status: false, message: 'member not found' })
+            member.default_store_slug = resolved.storeSlug
+            await member.save()
+
+            return response.json({
+                status: true,
+                data: {
+                    store_slug: resolved.storeSlug,
+                    store_name: resolved.store.store_name || resolved.store.name || resolved.storeSlug
+                }
+            })
+        } catch (error) {
+            return response.status(503).json({ status: false, message: error.message, code: error.code || 'STORE_UNAVAILABLE' })
+        }
+    }
+
     async upload_profile_photo({request, response, auth}) {
         const profilePhoto = request.file('photo', {
             types: ['image'],

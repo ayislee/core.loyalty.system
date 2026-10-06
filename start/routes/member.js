@@ -7,6 +7,7 @@ const prefix='/api/v1/member'
 Route.group(()=>{
     Route.get('/profile','MemberController.profile')
     Route.put('/profile','MemberController.profile_update')
+    Route.put('/default-store','MemberController.update_default_store')
     Route.post('/profile/photo','MemberController.upload_profile_photo')
     Route.post('/profile/email/request','MemberController.request_email_verification')
     Route.post('/profile/email/verify','MemberController.verify_email')

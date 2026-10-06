@@ -1,4 +1,4 @@
-Buatkan issue-back-btn.md pada folder clent.loyalty.system yang berisi perencanaan untuk nanti di implementasikan oleh jonior programmer atau ai model yang lebih murah
+Buatkan issue-v2-banner.md pada core.loyalty.system yang berisi perencanaan untuk nanti di implementasikan oleh jonior programmer atau ai model yang lebih murah
 
 ** struktur folder:
 1. core.loyalty.system = backend loyalty / proxy
@@ -7,16 +7,22 @@ Buatkan issue-back-btn.md pada folder clent.loyalty.system yang berisi perencana
 4. backend-mediacartz = backend marketplace / MARKETPLACE_CORE
 5. frontend-mediacartz = frontend marketplace untuk backend-mediacartz
 
-** Informasi umum:
-Notulensi hasil Meeting ada di file core.loyalty.system/dengan referensia file core.loyalty.system/NOTULENSI_EVALUASI_MARKETPLACE.md berisi rencana update ke depan.
+** Scoop Perubahan:
+1. core.loyalty.system = backend loyalty / proxy
+2. client.loyalty.system = frontend loyalty customer
+3. cms.loyalty.system = frontend management loyalty
 
-** tujuan :
-membuat issue berdasarkan file dengan referensia file core.loyalty.system/NOTULENSI_EVALUASI_MARKETPLACE.md:
-pembahasan ### 1. Tombol kembali dari halaman detail produk
 
-** Permasalahan:
+** Latar belakang:
 
-** planing nya adalah:
-buatkan issue terkait  "1. Tombol kembali dari halaman detail produk" yang ada di   core.loyalty.system/NOTULENSI_EVALUASI_MARKETPLACE.md
+** Tujuan:
+membuat issue berdasarkan file core.loyalty.system/NOTULENSI_EVALUASI_MARKETPLACE.md 
 
-jangan buatkan terlalu detain instruksi unit test nya. buatkan saja skenario apa yang harus di test, biarkan yang mengimplementasi detail skenarionya adalah junior programer atau model ai yang lebih murah
+** Planning nya adalah:
+1. buatkan issue berdasarkan core.loyalty.system/NOTULENSI_EVALUASI_MARKETPLACE.md bagian ### 3. dan ### 4. Pengaturan promo melalui CMS Loyalty
+2. tempatkan di halaman /product sebelum bagian search product bukan pada kategory semua seperti pada notulen
+3. buat menu baru pada cms.loyalty.system, dengan ui yang profesional dan user frendly
+
+**  buat issue secara detail termasuk kira-kira apa saja file yang harus di modifikasi atau di create
+
+** jangan buatkan terlalu detain instruksi unit test nya. buatkan saja skenario apa yang harus di test, biarkan yang mengimplementasi detail skenarionya adalah junior programer atau model ai yang lebih murah

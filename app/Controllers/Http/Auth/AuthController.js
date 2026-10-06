@@ -10,6 +10,7 @@ const moment = use('moment')
 const MemberPartner = use('App/Models/MemberPartner')
 const Partner = use('App/Models/Partner')
 const MemberActivityLogger = use('App/Helpers/MemberActivityLogger')
+const MemberStoreService = use('App/Services/MemberStoreService')
 class AuthController {
 
     async getDefaultPartner(request) {
@@ -299,6 +300,12 @@ class AuthController {
                     await data.save()
                 }
 
+                const storeSelection = await MemberStoreService.resolve(data.default_store_slug, partner.company_slug)
+                if (data.default_store_slug !== storeSelection.storeSlug) {
+                    data.default_store_slug = storeSelection.storeSlug
+                    await data.save()
+                }
+
                 const token = await auth.authenticator(request.all().lid_type).generate(data)
                 await MemberActivityLogger.record({
                     memberId: data.member_id,
@@ -316,6 +323,8 @@ class AuthController {
                     message: 'success',
                     data: {...token,
                         user:data,
+                        default_store_slug: storeSelection.storeSlug,
+                        default_store_name: storeSelection.store.store_name || storeSelection.store.name || storeSelection.storeSlug,
                         partner_id: partnerId,
                         partner: {
                             primary_color: partner.primary_color,

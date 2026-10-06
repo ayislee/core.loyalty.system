@@ -14,6 +14,7 @@ require('./get_point')
 require('./redeem_merchant')
 require('./member')
 require('./report')
+require('./promo_banner')
 
 if(Env.get('NODE_ENV')==='development'){
     require('./test')
