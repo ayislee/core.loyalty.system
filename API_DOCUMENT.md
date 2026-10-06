@@ -1758,6 +1758,46 @@ Prefix: `/api/v1/public`
 }
 ```
 
+### GET `/api/v1/public/product/best-sellers`
+- Controller: `ProductController.publicBestSellers`
+- Query:
+  - `store_slug` (opsional; jika kosong menggunakan `DEFAULT_STORE_SLUG`)
+- Mengembalikan maksimal 8 produk retail terlaris perusahaan yang tersedia pada toko aktif. Periode dimulai tujuh hari sebelum transaksi retail berhasil terakhir dan tidak dihitung dari waktu request.
+- Response sukses:
+
+```json
+{
+  "status": true,
+  "data": {
+    "period_start": "2026-09-15 12:06:21",
+    "period_end": "2026-09-22T05:06:21.000Z",
+    "products": [
+      {
+        "rank": 1,
+        "item_id": 42,
+        "item_name": "Sourdough Country Style",
+        "item_slug": "sourdough-country-style",
+        "menu_slug": "sourdough-country-style-freshly-baked-by-origin-bakery-jakarta-barat",
+        "image_url": "https://cdn.example.com/product.jpg",
+        "current_price": 35000,
+        "stock": 12,
+        "sold_quantity": 207
+      }
+    ]
+  }
+}
+```
+
+- Jika belum ada transaksi retail berhasil, `period_start` dan `period_end` bernilai `null`, sementara `products` berupa array kosong.
+- Response gagal validasi (HTTP 400):
+
+```json
+{
+  "status": false,
+  "message": "Toko tidak ditemukan"
+}
+```
+
 ### GET `/api/v1/public/product/detail`
 - Controller: `ProductController.publicProductDetail`
 - Query/Body: `slug` (required)

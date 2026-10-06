@@ -9,6 +9,9 @@ const Env = use('Env')
 const CompanyPaymentGatewayService = use('App/Services/CompanyPaymentGatewayService')
 const MemberStoreService = use('App/Services/MemberStoreService')
 
+const BEST_SELLER_CACHE_TTL_MS = 5 * 60 * 1000
+const bestSellerCache = new Map()
+
 const PRODUCT_SEARCH_KEYS = [
     'item_name',
     'item_sku',
@@ -44,6 +47,60 @@ class ProductController {
         }
         if (Array.isArray(data?.data)) return data.data
         return []
+    }
+
+    _collectCategoryDisplayIds (value, categoryIds = new Set()) {
+        if (Array.isArray(value)) {
+            value.forEach((item) => this._collectCategoryDisplayIds(item, categoryIds))
+            return categoryIds
+        }
+
+        if (!value || typeof value !== 'object') return categoryIds
+
+        const categoryId = value.category_display_id
+        if (categoryId !== undefined && categoryId !== null && `${categoryId}`.trim() !== '') {
+            categoryIds.add(`${categoryId}`)
+        }
+
+        Object.values(value).forEach((item) => this._collectCategoryDisplayIds(item, categoryIds))
+        return categoryIds
+    }
+
+    _collectCategoryDisplayNames (payload) {
+        const data = payload?.data ?? payload
+        const menuGroups = data?.menu
+        if (!menuGroups || typeof menuGroups !== 'object' || Array.isArray(menuGroups)) return new Set()
+
+        return new Set(Object.keys(menuGroups).map((name) => `${name}`.trim()).filter(Boolean))
+    }
+
+    async _appendReviewSummaries (products) {
+        const itemIds = [...new Set((Array.isArray(products) ? products : [])
+            .map((product) => product?.item_id)
+            .filter((itemId) => itemId !== undefined && itemId !== null))]
+
+        if (!itemIds.length) return products
+
+        const summaries = await Database
+            .from('product_reviews')
+            .whereIn('item_id', itemIds)
+            .select('item_id')
+            .avg('rating as avg_rating')
+            .count('* as total')
+            .groupBy('item_id')
+
+        const summaryByItemId = new Map(summaries.map((summary) => [
+            `${summary.item_id}`,
+            {
+                average: summary.avg_rating ? Number(summary.avg_rating) : 0,
+                total: summary.total ? Number(summary.total) : 0
+            }
+        ]))
+
+        return products.map((product) => ({
+            ...product,
+            review_summary: summaryByItemId.get(`${product?.item_id}`) || { average: 0, total: 0 }
+        }))
     }
 
     _aggregateProductAvailability (product) {
@@ -172,6 +229,15 @@ class ProductController {
     _filterProductList(items, keyword) {
         if (!keyword || !Array.isArray(items)) return items
         return items.filter((item) => this._productMatchesKeyword(item, keyword))
+    }
+
+    _filterProductsByCategoryName (items, categoryName) {
+        const normalizedCategoryName = `${categoryName || ''}`.trim().toLowerCase()
+        if (!normalizedCategoryName || !Array.isArray(items)) return items
+
+        return items.filter((item) => (
+            `${item?.category_display_name || item?.category_name || ''}`.trim().toLowerCase() === normalizedCategoryName
+        ))
     }
 
     _filterProductIdentifiers(items, itemId, itemSlug) {
@@ -440,7 +506,7 @@ class ProductController {
     }
 
     async publicCategory({ request, response }) {
-        const { company_slug } = request.get()
+        const { company_slug, store_slug } = request.get()
         const defaultCompanySlug = Env.get('DEFAULT_COMPANY_SLUG')
 
         const activeCompanySlug = company_slug || defaultCompanySlug
@@ -455,7 +521,42 @@ class ProductController {
         const api = `${Env.get('MARKETPLACE_CORE')}company/slug/${activeCompanySlug}/category`
 
         try {
-            const res = await axios.get(api)
+            const categoryRequest = axios.get(api)
+
+            if (store_slug) {
+                const [res, resolved] = await Promise.all([
+                    categoryRequest,
+                    MemberStoreService.resolve(store_slug, activeCompanySlug)
+                ])
+
+                if (res?.data?.error) {
+                    return response.json({
+                        status: false,
+                        message: res.data.error
+                    })
+                }
+
+                if (!resolved.isValid) {
+                    return response.badRequest({ status: false, message: 'Toko tidak ditemukan' })
+                }
+
+                const categories = Array.isArray(res?.data?.data) ? res.data.data : []
+                const menuApi = `${Env.get('MARKETPLACE_CORE')}store/slug/${resolved.storeSlug}/menu`
+                const menuResponse = await axios.get(menuApi)
+                const categoryIds = this._collectCategoryDisplayIds(this._extractMenuItems(menuResponse?.data))
+                const categoryNames = this._collectCategoryDisplayNames(menuResponse?.data)
+                const filteredCategories = categories.filter((category) => (
+                    categoryIds.has(`${category?.category_display_id}`) ||
+                    categoryNames.has(`${category?.category_display_name || ''}`.trim())
+                ))
+
+                return response.json({
+                    ...res.data,
+                    data: filteredCategories
+                })
+            }
+
+            const res = await categoryRequest
 
             if (res?.data?.error) {
                 return response.json({
@@ -475,7 +576,7 @@ class ProductController {
     }
 
     async publicProduct({ request, response }) {
-        const { store_slug, company_slug, item_id, item_slug, category_display_id, category_displat_id, keyword, page, rows } = request.get()
+        const { store_slug, company_slug, item_id, item_slug, category_display_id, category_displat_id, category_display_name, keyword, page, rows } = request.get()
         const defaultCompanySlug = Env.get('DEFAULT_COMPANY_SLUG')
         const activeCategoryDisplayId = category_display_id || category_displat_id
         const activeKeyword = this._normalizeKeyword(keyword)
@@ -516,10 +617,12 @@ class ProductController {
             }
 
             const matchedItems = this._filterProductIdentifiers(this._extractMenuItems(res?.data), item_id, item_slug)
+            const categoryItems = this._filterProductsByCategoryName(matchedItems, category_display_name)
             const productItems = this._sanitizeMarketplaceProduct(this._aggregateProductPayload(
-                this._filterProductList(matchedItems, activeKeyword)
+                this._filterProductList(categoryItems, activeKeyword)
             ))
             const pagination = this._paginateProductList(productItems, page, rows)
+            pagination.data = await this._appendReviewSummaries(pagination.data)
 
             return response.json({
                 status: true,
@@ -532,6 +635,78 @@ class ProductController {
             return response.json({
                 status: false,
                 message: error.message
+            })
+        }
+    }
+
+    async publicBestSellers ({ request, response }) {
+        const companySlug = Env.get('DEFAULT_COMPANY_SLUG')
+        const requestedStoreSlug = request.input('store_slug')
+
+        if (!companySlug) {
+            return response.badRequest({ status: false, message: 'DEFAULT_COMPANY_SLUG belum dikonfigurasi' })
+        }
+
+        try {
+            const resolved = await MemberStoreService.resolve(requestedStoreSlug, companySlug)
+            if (requestedStoreSlug && !resolved.isValid) {
+                return response.badRequest({ status: false, message: 'Toko tidak ditemukan' })
+            }
+
+            const cacheKey = `${companySlug}:${resolved.storeSlug}`
+            const cached = bestSellerCache.get(cacheKey)
+            let upstreamRequest
+
+            if (cached && cached.expiresAt > Date.now()) {
+                upstreamRequest = cached.value
+            } else {
+                upstreamRequest = axios.get(
+                    `${Env.get('MARKETPLACE_CORE')}company/slug/${encodeURIComponent(companySlug)}/product/best-sellers`,
+                    {
+                        params: { store_slug: resolved.storeSlug, limit: 8 },
+                        timeout: 8000
+                    }
+                ).then((upstreamResponse) => {
+                    if (upstreamResponse?.data?.error) throw new Error(upstreamResponse.data.error)
+                    return upstreamResponse?.data?.data || null
+                })
+
+                const entry = {
+                    expiresAt: Date.now() + BEST_SELLER_CACHE_TTL_MS,
+                    value: upstreamRequest
+                }
+                bestSellerCache.set(cacheKey, entry)
+                upstreamRequest.catch(() => {
+                    if (bestSellerCache.get(cacheKey) === entry) bestSellerCache.delete(cacheKey)
+                })
+            }
+
+            const upstreamData = await upstreamRequest
+            const products = Array.isArray(upstreamData?.products) ? upstreamData.products : []
+
+            return response.json({
+                status: true,
+                data: {
+                    period_start: upstreamData?.period_start || null,
+                    period_end: upstreamData?.period_end || null,
+                    products: products.map((product) => ({
+                        rank: Number(product?.rank) || 0,
+                        item_id: product?.item_id,
+                        item_name: product?.item_name || 'Produk tanpa nama',
+                        item_slug: product?.item_slug || product?.menu_slug || '',
+                        menu_slug: product?.menu_slug || '',
+                        image_url: Array.isArray(product?.item_image) ? product.item_image[0] : product?.item_image,
+                        current_price: Number(product?.current_price) || 0,
+                        stock: Number(product?.menu_current_quantity) || 0,
+                        sold_quantity: Number(product?.sold_quantity) || 0
+                    })).filter((product) => product.item_id && product.item_slug)
+                }
+            })
+        } catch (error) {
+            const isTimeout = error?.code === 'ECONNABORTED' || `${error?.message || ''}`.toLowerCase().includes('timeout')
+            return response.status(isTimeout ? 504 : 502).json({
+                status: false,
+                message: isTimeout ? 'Waktu memuat produk terlaris habis' : (error.message || 'Gagal memuat produk terlaris')
             })
         }
     }

@@ -13,6 +13,7 @@ Route.group(()=>{
     Route.get('/store','ProductController.publicStore')
     Route.get('/category','ProductController.publicCategory')
     Route.get('/product','ProductController.publicProduct')
+    Route.get('/product/best-sellers','ProductController.publicBestSellers')
     Route.get('/product/detail','ProductController.publicProductDetail')
     Route.get('/product/review','ProductController.publicProductReview')
     Route.post('/activity-history/product-page','MemberController.record_product_page_visit')

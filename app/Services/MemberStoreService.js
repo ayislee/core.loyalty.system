@@ -3,6 +3,9 @@
 const axios = use('axios')
 const Env = use('Env')
 
+const STORE_LIST_CACHE_TTL_MS = 30 * 1000
+const storeListCache = new Map()
+
 class MemberStoreService {
     static normalizeStores (payload) {
         const data = payload?.data ?? payload
@@ -18,13 +21,34 @@ class MemberStoreService {
             throw error
         }
 
-        const response = await axios.get(`${Env.get('MARKETPLACE_CORE')}company/slug/${companySlug}/store`)
-        if (response?.data?.error) {
-            const error = new Error(response.data.error)
-            error.code = 'STORE_LIST_UNAVAILABLE'
+        const cached = storeListCache.get(companySlug)
+        if (cached && cached.expiresAt > Date.now()) {
+            return cached.value
+        }
+
+        const request = axios
+            .get(`${Env.get('MARKETPLACE_CORE')}company/slug/${companySlug}/store`)
+            .then((response) => {
+                if (response?.data?.error) {
+                    const error = new Error(response.data.error)
+                    error.code = 'STORE_LIST_UNAVAILABLE'
+                    throw error
+                }
+                return this.normalizeStores(response?.data)
+            })
+
+        const entry = {
+            expiresAt: Date.now() + STORE_LIST_CACHE_TTL_MS,
+            value: request
+        }
+        storeListCache.set(companySlug, entry)
+
+        try {
+            return await request
+        } catch (error) {
+            if (storeListCache.get(companySlug) === entry) storeListCache.delete(companySlug)
             throw error
         }
-        return this.normalizeStores(response?.data)
     }
 
     static async findBySlug (slug, companySlug) {
