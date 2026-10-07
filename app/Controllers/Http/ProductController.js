@@ -120,17 +120,21 @@ class ProductController {
         const representative = eligibleMenus
             .slice()
             .sort((a, b) => (Number(b?.menu_current_quantity) || 0) - (Number(a?.menu_current_quantity) || 0))[0]
-        const internalPlatform = (representative?.menu_platform || []).find(
-            (platform) => platform?.ms_merchant_payment?.ms_merchant_payment_identifier === 'INTERNAL_MARKETPLACE'
-        )
-        const currentPrice = Number(internalPlatform?.menu_platform_discount_price) ||
-            Number(internalPlatform?.menu_platform_regular_price) ||
-            Number(representative?.menu_discount_price) ||
-            Number(representative?.menu_regular_price) ||
-            Number(product.item_discount_price) || Number(product.item_regular_price) || 0
+        const regularPrice = Number(representative?.menu_regular_price ?? product.menu_regular_price) || 0
+        const configuredDiscount = representative?.menu_discount_marketplace_price ?? product.menu_discount_marketplace_price
+        const marketplaceDiscountPrice = configuredDiscount === null || configuredDiscount === undefined ? null : Number(configuredDiscount)
+        const hasMarketplaceDiscount = Number.isFinite(marketplaceDiscountPrice) && marketplaceDiscountPrice > 0 && marketplaceDiscountPrice < regularPrice
+        const currentPrice = hasMarketplaceDiscount ? marketplaceDiscountPrice : regularPrice
 
         return {
             ...product,
+            // A catalogue entry represents one menu at the active store. Keep
+            // that identity after the nested menu payload is sanitized.
+            menu_id: representative?.menu_id ?? product.menu_id,
+            menu_slug: representative?.menu_slug ?? product.menu_slug,
+			menu_regular_price: regularPrice,
+			menu_discount_marketplace_price: hasMarketplaceDiscount ? marketplaceDiscountPrice : null,
+			has_marketplace_discount: hasMarketplaceDiscount,
             menu_current_quantity: aggregateStock,
             current_price: currentPrice,
             available: aggregateStock > 0,
@@ -240,9 +244,13 @@ class ProductController {
         ))
     }
 
-    _filterProductIdentifiers(items, itemId, itemSlug) {
-        if (!Array.isArray(items) || (!itemId && !itemSlug)) return items
+    _filterProductIdentifiers(items, menuId, itemId, itemSlug) {
+        if (!Array.isArray(items) || (!menuId && !itemId && !itemSlug)) return items
         return items.filter((item) => {
+            if (menuId && (
+                `${item?.menu_id}` === `${menuId}` ||
+                (Array.isArray(item?.menu) && item.menu.some((menu) => `${menu?.menu_id}` === `${menuId}`))
+            )) return true
             if (itemId && `${item?.item_id}` === `${itemId}`) return true
             if (itemSlug && [item?.item_slug, item?.slug, item?.menu_slug].some((value) => `${value || ''}` === `${itemSlug}`)) return true
             return false
@@ -576,7 +584,7 @@ class ProductController {
     }
 
     async publicProduct({ request, response }) {
-        const { store_slug, company_slug, item_id, item_slug, category_display_id, category_displat_id, category_display_name, keyword, page, rows } = request.get()
+        const { store_slug, company_slug, menu_id, item_id, item_slug, category_display_id, category_displat_id, category_display_name, keyword, page, rows } = request.get()
         const defaultCompanySlug = Env.get('DEFAULT_COMPANY_SLUG')
         const activeCategoryDisplayId = category_display_id || category_displat_id
         const activeKeyword = this._normalizeKeyword(keyword)
@@ -616,7 +624,7 @@ class ProductController {
                 })
             }
 
-            const matchedItems = this._filterProductIdentifiers(this._extractMenuItems(res?.data), item_id, item_slug)
+            const matchedItems = this._filterProductIdentifiers(this._extractMenuItems(res?.data), menu_id, item_id, item_slug)
             const categoryItems = this._filterProductsByCategoryName(matchedItems, category_display_name)
             const productItems = this._sanitizeMarketplaceProduct(this._aggregateProductPayload(
                 this._filterProductList(categoryItems, activeKeyword)
@@ -691,15 +699,19 @@ class ProductController {
                     period_end: upstreamData?.period_end || null,
                     products: products.map((product) => ({
                         rank: Number(product?.rank) || 0,
+                        menu_id: product?.menu_id,
                         item_id: product?.item_id,
                         item_name: product?.item_name || 'Produk tanpa nama',
                         item_slug: product?.item_slug || product?.menu_slug || '',
                         menu_slug: product?.menu_slug || '',
                         image_url: Array.isArray(product?.item_image) ? product.item_image[0] : product?.item_image,
+						menu_regular_price: Number(product?.menu_regular_price) || 0,
+						menu_discount_marketplace_price: product?.menu_discount_marketplace_price ?? null,
+						has_marketplace_discount: Boolean(product?.has_marketplace_discount),
                         current_price: Number(product?.current_price) || 0,
                         stock: Number(product?.menu_current_quantity) || 0,
                         sold_quantity: Number(product?.sold_quantity) || 0
-                    })).filter((product) => product.item_id && product.item_slug)
+                    })).filter((product) => product.menu_id && product.item_slug)
                 }
             })
         } catch (error) {
@@ -726,6 +738,9 @@ class ProductController {
             const api = `${Env.get('MARKETPLACE_CORE')}menu/slug/${slug}`
             const res = await axios.get(api)
             let productData = res?.data?.data
+			if (res?.data?.error && `${res.data.error}`.toLowerCase().includes('tidak tersedia di marketplace')) {
+				return response.status(404).json({ status: false, message: 'Produk tidak tersedia' })
+			}
             if (res?.data?.error || !productData) {
                 const companySlug = req.company_slug || Env.get('DEFAULT_COMPANY_SLUG')
                 const itemResponse = await axios.get(`${Env.get('MARKETPLACE_CORE')}company/slug/${companySlug}/item`, {

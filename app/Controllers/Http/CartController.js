@@ -97,7 +97,10 @@ class CartController {
         try {
             const duplicateCarts = await Cart.query()
             .where('member_id',auth.user.member_id)
-            .where('item_id',req.item_id)
+			.where((builder) => {
+				if (req.menu_id) builder.where('menu_id', req.menu_id)
+				else builder.where('item_id', req.item_id)
+			})
             .fetch()
             const existingCarts = duplicateCarts.toJSON()
             cart = existingCarts[0] ? await Cart.find(existingCarts[0].cart_id) : null
@@ -105,6 +108,7 @@ class CartController {
                 cart.quantity = Number(req.quantity || 0) + existingCarts.reduce((total, item) => total + Number(item.quantity || 0), 0)
                 cart.note = req.note
                 cart.menu_slug = req.menu_slug
+				cart.menu_id = req.menu_id || cart.menu_id
                 cart.item_image = req.item_image
                 cart.checked = '1'
                 // Deliberately do not use client supplied store metadata.
@@ -113,6 +117,7 @@ class CartController {
                 cart = new Cart()
                 cart.member_id = auth.user.member_id
                 cart.item_id = req.item_id
+				cart.menu_id = req.menu_id || null
                 cart.item_name = req.item_name
                 cart.quantity = req.quantity
                 cart.note = req.note

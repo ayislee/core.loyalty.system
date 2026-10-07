@@ -1731,6 +1731,7 @@ Prefix: `/api/v1/public`
 - Query:
   - `store_slug` (opsional)
   - `company_slug` (dipakai jika `store_slug` tidak ada)
+  - `menu_id` (opsional; mengambil satu menu pada toko aktif)
 - Response sukses:
 
 ```json
@@ -1774,6 +1775,7 @@ Prefix: `/api/v1/public`
     "products": [
       {
         "rank": 1,
+        "menu_id": 314,
         "item_id": 42,
         "item_name": "Sourdough Country Style",
         "item_slug": "sourdough-country-style",

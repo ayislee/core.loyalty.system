@@ -111,7 +111,8 @@ class MarketplaceFulfillmentService {
     }
 
     menuForCart (menu, cart) {
-        return menu.find((entry) => `${this.value(entry, ['item_id', 'menu_item_id', 'item.item_id'])}` === `${cart.item_id}`) ||
+		return menu.find((entry) => cart.menu_id && `${this.value(entry, ['menu_id'])}` === `${cart.menu_id}`) ||
+			menu.find((entry) => `${this.value(entry, ['item_id', 'menu_item_id', 'item.item_id'])}` === `${cart.item_id}`) ||
             menu.find((entry) => cart.menu_slug && `${this.value(entry, ['menu_slug', 'item_slug', 'slug'])}` === `${cart.menu_slug}`)
     }
 

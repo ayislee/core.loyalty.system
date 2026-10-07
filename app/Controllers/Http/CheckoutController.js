@@ -88,6 +88,7 @@ class CheckoutController {
 
     buildOrderPayload ({ member, carts, address, selection, request, cashierId }) {
         const item = carts.map((cart) => ({
+			menu_id: cart.menu_id || null,
             item_id: cart.item_id,
             menu_slug: cart.menu_slug,
             item_name: cart.item_name,
@@ -200,7 +201,7 @@ class CheckoutController {
                 member_id: auth.user.member_id, selected_cart_ids: context.carts.map((cart) => cart.cart_id),
                 address_id: context.address.address_id, address_coordinate: context.coordinate,
                 store_id: selectedStore.storeId, store_slug: selectedStore.storeSlug, company_slug: companySlug, partner_id: paymentGateway.partner_id,
-                items: context.carts.map((cart) => ({ cart_id: cart.cart_id, item_id: cart.item_id, quantity: Number(cart.quantity), note: cart.note || null })),
+				items: context.carts.map((cart) => ({ cart_id: cart.cart_id, menu_id: cart.menu_id || null, item_id: cart.item_id, quantity: Number(cart.quantity), note: cart.note || null })),
                 ms_payment_id: paymentGateway.ms_payment_id, payment_gateway_identifier: paymentGateway.identifier, ms_delivery_id: req.ms_delivery_id || null,
                 shipping_service: selectedShipping.service, voucher_code: req.voucher_code || null,
                 client_request_id: req.client_request_id || null, expires_at: expiresAt
