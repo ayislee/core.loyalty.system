@@ -1,4 +1,4 @@
-Buatkan issue-v2-banner.md pada core.loyalty.system yang berisi perencanaan untuk nanti di implementasikan oleh jonior programmer atau ai model yang lebih murah
+Buatkan issue-v2-cart.md pada core.loyalty.system yang berisi perencanaan untuk nanti di implementasikan oleh jonior programmer atau ai model yang lebih murah
 
 ** struktur folder:
 1. core.loyalty.system = backend loyalty / proxy
@@ -10,19 +10,28 @@ Buatkan issue-v2-banner.md pada core.loyalty.system yang berisi perencanaan untu
 ** Scoop Perubahan:
 1. core.loyalty.system = backend loyalty / proxy
 2. client.loyalty.system = frontend loyalty customer
-3. cms.loyalty.system = frontend management loyalty
+3. backend-mediacartz = backend marketplace / MARKETPLACE_CORE kalau diperlukan
 
 
 ** Latar belakang:
+1. Saat ini pada client.royalty pada halaman /product hanya menampilkan katalog pada toko tertentu, halaman /cart menampilkan product-product yang sudah dipilih dari halaman /product/[menu_slug], selanjutnya di simpan di tabel cart di database loyalty.
+2. Pada tabel cart, product yang dipilih tidak mencatat toko dan company mana produk dan berasal
+3. Saat ini saat masuk ke halaman checkout, akan mengecek dan otomatis memilih toko berdasarkan jarak dan ketersediaan produk, hal ini menimbulkan kekeceaan konsumen, sudah memasukan produk ke keranjang, ternyata tidak bisa dibeli karena alasan tertentu
+4. Saat ini konsumen tidak mengetahui dia bertransaksi di toko mana
 
 ** Tujuan:
-membuat issue berdasarkan file core.loyalty.system/NOTULENSI_EVALUASI_MARKETPLACE.md 
+mempersingkat alur checkout dan pembayaran dan memberi kepastian ke konsumen bahwa produk yang akan dibeli benar-benar tersedia dan konsumen menyadari saat memilih produk toko nya jelas   
 
 ** Planning nya adalah:
-1. buatkan issue berdasarkan core.loyalty.system/NOTULENSI_EVALUASI_MARKETPLACE.md bagian ### 3. dan ### 4. Pengaturan promo melalui CMS Loyalty
-2. tempatkan di halaman /product sebelum bagian search product bukan pada kategory semua seperti pada notulen
-3. buat menu baru pada cms.loyalty.system, dengan ui yang profesional dan user frendly
+1. Memastikan produk yang ada di katalog benar ada di toko yang dipilih
+2. Menggabungkan /cart ke /product dengan cara:
+   - Pada Katalog produk (/product) di sebelah kanan ada tombol lingkaran (+) yang artinya masuk ke cart dan di catat pada tabel cart menu_id, partner_id, store_slug dan store_name nya
+   - tombol (+) ditekan akan berubah seperti [-] [Jumlah] [+] untuk menambah dan mengurangi jumlah yang dimasukan ke cart, ada juga tombol sampah untuk menghapus keranjang, kalau sudah dihapus kembali muncul tombol (+)
+4. Pada bagian bawah setelah katalog ada summary berapa produk yang dipilih di keranjang, jumlah uang yang harus dibayar dan tombol checkout (ilustrasi gambar ada di file core.loyalty.system/docs/img/page_product.png)
+5. apabila di klik tombol checkout, akan langsung di arahkan ke halaman checkout tanpa harus mengecek toko dan jarak karena sudah jelas toko tujuan nya.
+
+
+
 
 **  buat issue secara detail termasuk kira-kira apa saja file yang harus di modifikasi atau di create
-
 ** jangan buatkan terlalu detain instruksi unit test nya. buatkan saja skenario apa yang harus di test, biarkan yang mengimplementasi detail skenarionya adalah junior programer atau model ai yang lebih murah

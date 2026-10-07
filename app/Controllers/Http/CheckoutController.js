@@ -26,12 +26,18 @@ class CheckoutController {
         if (!ids.length) throw new MarketplaceFulfillmentService.Error('EMPTY_CART_SELECTION', 'Pilih minimal satu produk untuk checkout.')
         const carts = (await Cart.query().where('member_id', memberId).whereIn('cart_id', ids).fetch()).toJSON()
         if (carts.length !== ids.length) throw new MarketplaceFulfillmentService.Error('FULFILLMENT_CHANGED', 'Keranjang berubah. Silakan tinjau ulang pesanan.', 409)
+        const contexts = new Set(carts.map((cart) => `${cart.company_slug || ''}:${cart.partner_id || ''}:${cart.store_id || ''}:${cart.store_slug || ''}`))
+        if (contexts.size !== 1) throw new MarketplaceFulfillmentService.Error('CART_STORE_MISMATCH', 'Produk checkout harus berasal dari satu toko yang sama.', 409)
+        const cartStore = carts[0]
+        if (!cartStore.store_slug || !cartStore.store_id || !cartStore.company_slug) {
+            throw new MarketplaceFulfillmentService.Error('CART_CONTEXT_MISSING', 'Keranjang lama tidak memiliki informasi toko. Silakan pilih ulang produk.', 409)
+        }
         const address = await Address.query().where('address_id', addressId).where('member_id', memberId).first()
         if (!address) throw new MarketplaceFulfillmentService.Error('ADDRESS_NOT_FOUND', 'Alamat pengiriman tidak ditemukan.', 404)
         const service = new MarketplaceFulfillmentService()
         const coordinate = service.normalizeCoordinate(address.coordinate)
         if (!coordinate) throw new MarketplaceFulfillmentService.Error('ADDRESS_COORDINATE_REQUIRED', 'Lengkapi titik lokasi alamat untuk melanjutkan checkout.')
-        return { carts, address: address.toJSON(), coordinate, service }
+        return { carts, address: address.toJSON(), coordinate, service, cartStore }
     }
 
     async cashierId (companySlug) {
@@ -185,8 +191,11 @@ class CheckoutController {
                 member: auth.user,
                 partnerId: req.partner_id || null
             })
-            const companySlug = paymentGateway.company_slug
-            const selectedStore = await context.service.selectStore({ carts: context.carts, addressCoordinate: context.coordinate, companySlug, paymentType: paymentGateway.ms_payment_id })
+            const companySlug = context.cartStore.company_slug
+            if (paymentGateway.company_slug !== companySlug || `${paymentGateway.partner_id || ''}` !== `${context.cartStore.partner_id || ''}`) {
+                throw new MarketplaceFulfillmentService.Error('CART_STORE_MISMATCH', 'Partner atau company cart tidak sesuai.', 409)
+            }
+            const selectedStore = await context.service.validateSelectedStore({ carts: context.carts, storeSlug: context.cartStore.store_slug, companySlug, paymentType: paymentGateway.ms_payment_id, addressCoordinate: context.coordinate })
             selectedStore.companySlug = companySlug
             const shippingOptions = this.shippingOptions(selectedStore.gosendPayload)
             if (!shippingOptions.length) throw new MarketplaceFulfillmentService.Error('SHIPPING_UNAVAILABLE', 'Jasa pengiriman tidak tersedia untuk alamat ini.')
@@ -207,7 +216,7 @@ class CheckoutController {
                 client_request_id: req.client_request_id || null, expires_at: expiresAt
             })
             const responseData = this.quoteResponseData({ token, address: context.address, preview: previewResult.data.data || previewResult.data, paymentGateway })
-            responseData.provider_store_name = selectedStore.store?.store_name || selectedStore.store_name || null
+            responseData.provider_store_name = context.cartStore.store_name || selectedStore.store?.store_name || selectedStore.store_name || null
             responseData.shipping_options = shippingOptions
             responseData.selected = { ...responseData.selected, shipping_service: selectedShipping.service }
             return response.json({ status: true, message: 'Checkout quote berhasil dibuat', data: responseData })
@@ -227,7 +236,10 @@ class CheckoutController {
             if (paymentGateway.company_slug !== quote.company_slug || paymentGateway.identifier !== quote.payment_gateway_identifier || `${paymentGateway.ms_payment_id}` !== `${quote.ms_payment_id}`) {
                 throw new MarketplaceFulfillmentService.Error('PAYMENT_GATEWAY_CHANGED', 'Payment gateway company berubah. Silakan tinjau ulang pesanan.', 409)
             }
-            const selectedStore = await context.service.selectStore({ carts: context.carts, addressCoordinate: context.coordinate, companySlug: quote.company_slug, paymentType: quote.ms_payment_id })
+            if (context.cartStore.company_slug !== quote.company_slug || context.cartStore.store_slug !== quote.store_slug || `${context.cartStore.store_id}` !== `${quote.store_id}`) {
+                throw new MarketplaceFulfillmentService.Error('FULFILLMENT_CHANGED', 'Konteks toko keranjang berubah. Silakan tinjau ulang pesanan.', 409)
+            }
+            const selectedStore = await context.service.validateSelectedStore({ carts: context.carts, storeSlug: quote.store_slug, addressCoordinate: context.coordinate, companySlug: quote.company_slug, paymentType: quote.ms_payment_id })
             if (`${selectedStore.storeId}` !== `${quote.store_id}` || selectedStore.storeSlug !== quote.store_slug) throw new MarketplaceFulfillmentService.Error('FULFILLMENT_CHANGED', 'Stok atau ketersediaan toko berubah. Silakan tinjau ulang pesanan.', 409)
             selectedStore.companySlug = quote.company_slug
             const cashierId = await this.cashierId(quote.company_slug)
@@ -242,6 +254,9 @@ class CheckoutController {
             transaction.response = JSON.stringify(result.data)
             transaction.url = `${Env.get('MARKETPLACE_CORE')}transaction/retail/order`
             await transaction.save()
+            // Only remove the cart rows included in this successful transaction.
+            // Carts from other stores remain available to the member.
+            await Cart.query().where('member_id', auth.user.member_id).whereIn('cart_id', quote.selected_cart_ids).delete()
             return response.json({
                 status: true,
                 message: 'Checkout berhasil diproses',

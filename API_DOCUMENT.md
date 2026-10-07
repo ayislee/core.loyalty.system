@@ -1232,14 +1232,18 @@ atau
 
 ### GET `/api/v1/member/cart`
 - Controller: `CartController.list`
-- Validator: `Pages`
-- Query validator: `page`, `rows` (meski controller tidak pakai paginasi)
+- Query wajib: `store_slug`
+- Cart V2 selalu dibaca per toko. Cart toko lain tidak ikut dikembalikan.
 - Response:
 
 ```json
 {
   "status": true,
-  "data": "<array group by store_slug: [{store_slug,store_name,items:[...]}]>"
+  "data": {
+    "store": {"store_id": 10, "store_slug": "toko-a", "store_name": "Toko A", "company_slug": "company-a", "partner_id": 1},
+    "items": ["<cart item dengan menu_id, current_price, available_quantity, available>"],
+    "summary": {"line_count": 1, "item_count": 2, "subtotal": 50000}
+  }
 }
 ```
 
@@ -1259,21 +1263,20 @@ atau
 ### POST `/api/v1/member/cart`
 - Controller: `CartController.create`
 - Validator: tidak ada
-- Body yang dipakai:
-  - `item_id`
-  - `item_name`
-  - `quantity`
+- Body wajib:
+  - `menu_id`
+  - `store_slug`
+  - `quantity` (positif; default `1`)
+- Body optional:
   - `note` (optional)
-  - `item_image` (optional)
-  - `menu_slug` (optional)
-  - `store_slug` (optional)
-  - `store_name` (optional)
+- `item_id`, nama, gambar, harga, partner, company, dan toko tidak dipercaya dari client; semua di-resolve ulang dari Marketplace Core.
 - Response sukses:
 
 ```json
 {
   "status": true,
-  "message": "success"
+  "message": "Produk ditambahkan ke keranjang",
+  "data": "<Cart V2 response untuk store_slug yang sama>"
 }
 ```
 
@@ -1289,13 +1292,14 @@ atau
 ### PUT `/api/v1/member/cart`
 - Controller: `CartController.edit`
 - Validator: `CartID`
-- Body minimal: `cart_id`, field lain opsional
+- Body minimal: `cart_id`, `quantity` (absolute quantity). Nilai `0` menghapus baris cart.
 - Response:
 
 ```json
 {
   "status": true,
-  "message": "success"
+  "message": "Keranjang diperbarui",
+  "data": "<Cart V2 response untuk toko cart>"
 }
 ```
 
@@ -1308,7 +1312,8 @@ atau
 ```json
 {
   "status": true,
-  "message": "success"
+  "message": "Produk dihapus dari keranjang",
+  "data": "<Cart V2 response untuk toko cart>"
 }
 ```
 

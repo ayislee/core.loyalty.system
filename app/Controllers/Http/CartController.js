@@ -1,192 +1,142 @@
 'use strict'
+
 const Cart = use('App/Models/Cart')
-const axios = use('axios')
+const MarketplaceFulfillmentService = use('App/Services/MarketplaceFulfillmentService')
+const MemberStoreService = use('App/Services/MemberStoreService')
 const Env = use('Env')
 
 class CartController {
-    async list({request, response, auth}){
-        console.log('[CartController] list called', auth.user.member_id)
-        const req = request.all()
-        try {
-            const carts = await Cart.query()
-                .where('member_id',auth.user.member_id)
-                .orderBy('cart_id','desc')
-                .filter(req.filter)
-                .fetch()
-            const raw = carts.toJSON()
-
-            const enriched = await Promise.all(raw.map(async (item) => {
-                const out = { ...item }
-                try {
-                    const companySlug = Env.get('DEFAULT_COMPANY_SLUG')
-                    const api = `${Env.get('MARKETPLACE_CORE')}company/slug/${companySlug}/item`
-                    const res = await axios.get(api, { params: { item_id: item.item_id } })
-                    const products = Array.isArray(res?.data?.data) ? res.data.data : []
-                    const product = products.find((entry) => `${entry?.item_id}` === `${item.item_id}`) || products[0]
-                    if (product) {
-                        const menus = Array.isArray(product.menu) ? product.menu : []
-                        const representative = menus.slice().sort(
-                            (a, b) => Number(b?.menu_current_quantity || 0) - Number(a?.menu_current_quantity || 0)
-                        )[0] || {}
-                        const internalPlatform = (representative.menu_platform || []).find(
-                            (platform) => platform?.ms_merchant_payment?.ms_merchant_payment_identifier === 'INTERNAL_MARKETPLACE'
-                        )
-                        out.current_price = Number(internalPlatform?.menu_platform_discount_price) ||
-                            Number(internalPlatform?.menu_platform_regular_price) ||
-                            Number(product.item_discount_price) || Number(product.item_regular_price) || null
-                        out.menu_current_quantity = menus.reduce(
-                            (highest, menu) => Math.max(highest, Number(menu?.menu_current_quantity) || 0),
-                            0
-                        )
-                        out.item_sku = product.item_sku || item.item_sku || null
-                        out.sku = product.item_sku || item.sku || null
-                        out.product_sku = product.item_sku || item.product_sku || null
-                        out.menu_sku = product.item_sku || item.menu_sku || null
-                    } else {
-                        out.current_price = null
-                        out.menu_current_quantity = null
-                        out.item_sku = item.item_sku || null
-                        out.sku = item.sku || null
-                        out.product_sku = item.product_sku || null
-                        out.menu_sku = item.menu_sku || null
-                    }
-                } catch (error) {
-                    out.current_price = null
-                    out.menu_current_quantity = null
-                    out.item_sku = item.item_sku || null
-                    out.sku = item.sku || null
-                    out.product_sku = item.product_sku || null
-                    out.menu_sku = item.menu_sku || null
-                }
-                return out
-            }))
-
-            // Store is an internal fulfillment concern. Older rows can retain these
-            // columns, but marketplace clients always receive one flat cart list.
-            const items = enriched.map(({ store_slug, store_name, ...item }) => item)
-
-            return response.json({
-                status: true,
-                data: items
-            })
-        } catch (error) {
-            console.log(error)
-            return response.json({
-                status: false,
-                message: error.message
-            })
-        }
-    }
-
-    async get({request, response, auth}){
-        const req = request.all()
-        const cart = await Cart.query()
-        .where('cart_id',req.cart_id).where('member_id', auth.user.member_id)
-        .first()
-        if (!cart) return response.status(404).json({ status: false, message: 'cart not found' })
-        const { store_slug, store_name, ...safeCart } = cart.toJSON()
-        return response.json({
-            status: true,
-            data: safeCart
+    error (response, error) {
+        const known = error instanceof MarketplaceFulfillmentService.Error || (error && error.code && error.status)
+        const configurationError = /^DEFAULT_(COMPANY|STORE)_SLUG/.test(`${error?.code || ''}`)
+        if (!known) console.error('[CartController]', error?.code || 'UNKNOWN', error?.message || error)
+        return response.status(known ? error.status : (configurationError ? 422 : 502)).json({
+            status: false,
+            code: known ? error.code : (error?.code || 'MARKETPLACE_UPSTREAM_ERROR'),
+            message: known ? error.message : (configurationError ? 'Konfigurasi toko marketplace belum lengkap.' : 'Gagal memproses keranjang. Silakan coba lagi.'),
+            data: known ? error.data : null
         })
     }
 
-    async create({request, response, auth}){
-        const req = request.all()
-        let cart
-        try {
-            const duplicateCarts = await Cart.query()
-            .where('member_id',auth.user.member_id)
-			.where((builder) => {
-				if (req.menu_id) builder.where('menu_id', req.menu_id)
-				else builder.where('item_id', req.item_id)
-			})
-            .fetch()
-            const existingCarts = duplicateCarts.toJSON()
-            cart = existingCarts[0] ? await Cart.find(existingCarts[0].cart_id) : null
-            if(cart){
-                cart.quantity = Number(req.quantity || 0) + existingCarts.reduce((total, item) => total + Number(item.quantity || 0), 0)
-                cart.note = req.note
-                cart.menu_slug = req.menu_slug
-				cart.menu_id = req.menu_id || cart.menu_id
-                cart.item_image = req.item_image
-                cart.checked = '1'
-                // Deliberately do not use client supplied store metadata.
-                await Promise.all(existingCarts.slice(1).map((item) => Cart.find(item.cart_id).then((duplicate) => duplicate.delete())))
-            }else{
-                cart = new Cart()
-                cart.member_id = auth.user.member_id
-                cart.item_id = req.item_id
-				cart.menu_id = req.menu_id || null
-                cart.item_name = req.item_name
-                cart.quantity = req.quantity
-                cart.note = req.note
-                cart.item_image = req.item_image
-                cart.menu_slug = req.menu_slug
-                cart.checked = '1'
-                // Legacy nullable columns are intentionally left empty for new rows.
+    number (value) { const result = Number(value); return Number.isFinite(result) ? result : 0 }
+
+    async context (member, requestedStoreSlug) {
+        // Adding an item must not depend on payment-gateway configuration.
+        // The gateway is resolved only at checkout; catalog and cart use the
+        // same marketplace company as the active store.
+        const configuredCompanySlug = Env.get('DEFAULT_COMPANY_SLUG')
+        const resolved = await MemberStoreService.resolve(requestedStoreSlug, configuredCompanySlug)
+        if (!resolved.isValid) throw new MarketplaceFulfillmentService.Error('STORE_UNAVAILABLE', 'Toko tidak ditemukan atau tidak tersedia.', 422)
+        const service = new MarketplaceFulfillmentService()
+        const store = resolved.store || {}
+        const storeId = service.value(store, ['store_id', 'id'])
+        if (!storeId) throw new MarketplaceFulfillmentService.Error('STORE_UNAVAILABLE', 'Identitas toko tidak tersedia.', 422)
+        const companySlug = service.value(store, ['company.company_slug', 'company_slug']) || configuredCompanySlug
+        return { service, partnerId: member.default_partner_id || null, companySlug, storeId, storeSlug: resolved.storeSlug, storeName: service.value(store, ['store_name', 'name']) || resolved.storeSlug }
+    }
+
+    isLoyaltyMenu (service, menu) {
+        const value = service.value(menu, ['is_loyalty', 'menu_is_loyalty'])
+        return value === null || ['1', 'true', 'yes'].includes(`${value}`.toLowerCase())
+    }
+
+    menuSnapshot (service, menu) {
+        const item = menu?.item || {}
+        const image = service.value(menu, ['item_image', 'image_url', 'item.item_image'])
+        const stock = this.number(service.value(menu, ['menu_current_quantity', 'current_quantity', 'stock', 'quantity']))
+        const regular = this.number(service.value(menu, ['menu_regular_price', 'regular_price', 'item_regular_price', 'item.item_regular_price']))
+        const discount = this.number(service.value(menu, ['menu_discount_marketplace_price', 'discount_marketplace_price']))
+        return {
+            menuId: service.value(menu, ['menu_id']), itemId: service.value(menu, ['item_id', 'menu_item_id', 'item.item_id']),
+            itemName: service.value(menu, ['item_name', 'menu_name', 'item.item_name']) || item.item_name,
+            image: Array.isArray(image) ? image[0] : image, menuSlug: service.value(menu, ['menu_slug', 'item_slug', 'slug', 'item.item_slug']),
+            stock, price: discount > 0 && discount < regular ? discount : regular
+        }
+    }
+
+    async verifiedMenu (context, menuId) {
+        const id = Number(menuId)
+        if (!Number.isInteger(id) || id <= 0) throw new MarketplaceFulfillmentService.Error('MENU_NOT_AVAILABLE', 'menu_id tidak valid.', 422)
+        const menu = (await context.service.getStoreMenu(context.storeSlug)).find((entry) => `${context.service.value(entry, ['menu_id'])}` === `${id}`)
+        if (!menu || !this.isLoyaltyMenu(context.service, menu)) throw new MarketplaceFulfillmentService.Error('MENU_NOT_AVAILABLE', 'Produk tidak dijual di toko ini.', 422)
+        const snapshot = this.menuSnapshot(context.service, menu)
+        if (!snapshot.itemId || snapshot.stock <= 0) throw new MarketplaceFulfillmentService.Error('INSUFFICIENT_STOCK', 'Stok produk sedang tidak tersedia.', 422, { menu_id: id, available_quantity: snapshot.stock })
+        return snapshot
+    }
+
+    summary (items) {
+        return { line_count: items.length, item_count: items.reduce((total, item) => total + this.number(item.quantity), 0), subtotal: items.reduce((total, item) => total + this.number(item.current_price) * this.number(item.quantity), 0) }
+    }
+
+    async responseForStore (member, storeSlug) {
+        const context = await this.context(member, storeSlug)
+        const rows = (await Cart.query().where('member_id', member.member_id).where('store_slug', context.storeSlug).orderBy('cart_id', 'desc').fetch()).toJSON()
+        const menus = await context.service.getStoreMenu(context.storeSlug)
+        const items = rows.map((cart) => {
+            const menu = context.service.menuForCart(menus, cart)
+            const snapshot = menu ? this.menuSnapshot(context.service, menu) : null
+            return {
+                ...cart, item_id: snapshot?.itemId || cart.item_id, item_name: snapshot?.itemName || cart.item_name,
+                item_image: snapshot?.image || cart.item_image, menu_slug: snapshot?.menuSlug || cart.menu_slug,
+                current_price: snapshot?.price || null, available_quantity: snapshot?.stock ?? 0,
+                available: Boolean(snapshot && this.isLoyaltyMenu(context.service, menu) && snapshot.stock >= this.number(cart.quantity))
             }
-        
-            
-            await cart.save()
-            return response.json({
-                status: true,
-                message: "success"
-            })
-        } catch (error) {
-            console.log(error)
-            return response.json({
-                status: false,
-                message: error.message
-            })
-        }
+        })
+        return { store: { store_id: context.storeId, store_slug: context.storeSlug, store_name: context.storeName, company_slug: context.companySlug, partner_id: context.partnerId }, items, summary: this.summary(items) }
     }
 
-    async edit({request, response, auth}){
-        const req = request.all()
+    async list ({ request, response, auth }) {
         try {
-            const cart = await Cart.query().where('cart_id', req.cart_id).where('member_id', auth.user.member_id).first()
-            if (!cart) return response.status(404).json({ status: false, message: 'cart not found' })
-            cart.member_id = auth.user.member_id
-            cart.item_id = req.item_id
-            cart.item_name = req.item_name?req.item_name:cart.item_name
-            cart.quantity = req.quantity?req.quantity:cart.quantity 
-            cart.note = req.note?req.note:cart.note
-            cart.item_image = req.item_image?req.item_image:cart.item_image
-            cart.checked = req.checked ? req.checked : cart.checked
-            await cart.save()
-            return response.json({
-                status: true,
-                message: "success"
-            })
-        } catch (error) {
-            console.log(error)
-            return response.json({
-                status: false,
-                message: error.message
-            })
-        }
+            const storeSlug = request.input('store_slug')
+            if (!storeSlug) throw new MarketplaceFulfillmentService.Error('STORE_UNAVAILABLE', 'store_slug wajib diisi.', 422)
+            return response.json({ status: true, data: await this.responseForStore(auth.user, storeSlug) })
+        } catch (error) { return this.error(response, error) }
     }
 
-    async delete({request, response, auth}){
-        const req = request.all()
+    async get ({ request, response, auth }) {
+        const cart = await Cart.query().where('cart_id', request.input('cart_id')).where('member_id', auth.user.member_id).first()
+        if (!cart) return response.status(404).json({ status: false, code: 'CART_NOT_FOUND', message: 'cart not found' })
+        return response.json({ status: true, data: cart.toJSON() })
+    }
+
+    async create ({ request, response, auth }) {
         try {
-            const cart = await Cart.query().where('cart_id', req.cart_id).where('member_id', auth.user.member_id).first()
-            if (!cart) return response.status(404).json({ status: false, message: 'cart not found' })
-            await cart.delete()
-            return response.json({
-                status: true,
-                message: "success"
-            })
-        } catch (error) {
-            console.log(error)
-            return response.json({
-                status: false,
-                message: error.message
-            })
-        }
+            const req = request.all(); const context = await this.context(auth.user, req.store_slug); const quantity = Number(req.quantity || 1)
+            if (!Number.isInteger(quantity) || quantity <= 0) throw new MarketplaceFulfillmentService.Error('INVALID_QUANTITY', 'Jumlah produk tidak valid.', 422)
+            const menu = await this.verifiedMenu(context, req.menu_id)
+            let cart = await Cart.query().where('member_id', auth.user.member_id).where('store_slug', context.storeSlug).where('menu_id', menu.menuId).first()
+            const nextQuantity = quantity + this.number(cart?.quantity)
+            if (nextQuantity > menu.stock) throw new MarketplaceFulfillmentService.Error('INSUFFICIENT_STOCK', 'Jumlah melebihi stok yang tersedia.', 422, { menu_id: menu.menuId, available_quantity: menu.stock })
+            if (!cart) cart = new Cart()
+            Object.assign(cart, { member_id: auth.user.member_id, partner_id: context.partnerId, company_slug: context.companySlug, store_id: context.storeId, store_slug: context.storeSlug, store_name: context.storeName, menu_id: menu.menuId, item_id: menu.itemId, item_name: menu.itemName || 'Produk', item_image: menu.image || null, menu_slug: menu.menuSlug || null, quantity: nextQuantity, note: req.note || cart.note || null, checked: '1', unit_price_snapshot: menu.price, price_checked_at: new Date() })
+            await cart.save()
+            return response.json({ status: true, message: 'Produk ditambahkan ke keranjang', data: await this.responseForStore(auth.user, context.storeSlug) })
+        } catch (error) { return this.error(response, error) }
     }
 
+    async edit ({ request, response, auth }) {
+        try {
+            const cart = await Cart.query().where('cart_id', request.input('cart_id')).where('member_id', auth.user.member_id).first()
+            if (!cart) throw new MarketplaceFulfillmentService.Error('CART_NOT_FOUND', 'Cart tidak ditemukan.', 404)
+            const quantity = Number(request.input('quantity'))
+            if (!Number.isInteger(quantity) || quantity < 0) throw new MarketplaceFulfillmentService.Error('INVALID_QUANTITY', 'Jumlah produk tidak valid.', 422)
+            if (quantity === 0) { const slug = cart.store_slug; await cart.delete(); return response.json({ status: true, message: 'Produk dihapus dari keranjang', data: await this.responseForStore(auth.user, slug) }) }
+            const context = await this.context(auth.user, cart.store_slug); const menu = await this.verifiedMenu(context, cart.menu_id)
+            if (quantity > menu.stock) throw new MarketplaceFulfillmentService.Error('INSUFFICIENT_STOCK', 'Jumlah melebihi stok yang tersedia.', 422, { menu_id: cart.menu_id, available_quantity: menu.stock })
+            Object.assign(cart, { quantity, item_id: menu.itemId, item_name: menu.itemName || cart.item_name, item_image: menu.image || cart.item_image, menu_slug: menu.menuSlug || cart.menu_slug, unit_price_snapshot: menu.price, price_checked_at: new Date() })
+            await cart.save()
+            return response.json({ status: true, message: 'Keranjang diperbarui', data: await this.responseForStore(auth.user, cart.store_slug) })
+        } catch (error) { return this.error(response, error) }
+    }
+
+    async delete ({ request, response, auth }) {
+        try {
+            const cart = await Cart.query().where('cart_id', request.input('cart_id')).where('member_id', auth.user.member_id).first()
+            if (!cart) throw new MarketplaceFulfillmentService.Error('CART_NOT_FOUND', 'Cart tidak ditemukan.', 404)
+            const slug = cart.store_slug; await cart.delete()
+            return response.json({ status: true, message: 'Produk dihapus dari keranjang', data: await this.responseForStore(auth.user, slug) })
+        } catch (error) { return this.error(response, error) }
+    }
 }
 
 module.exports = CartController

@@ -185,6 +185,36 @@ class MarketplaceFulfillmentService {
         return candidates.sort((a, b) => a.distanceKm - b.distanceKm || b.stockRemaining - a.stockRemaining || `${a.storeId}`.localeCompare(`${b.storeId}`))[0]
     }
 
+    async validateSelectedStore ({ carts, storeSlug, companySlug, paymentType, addressCoordinate }) {
+        const stores = await this.getStores(companySlug)
+        const store = stores.find((entry) => `${this.value(entry, ['store_slug', 'slug'])}` === `${storeSlug}`)
+        if (!store || !this.isActiveStore(store)) throw new FulfillmentError('STORE_UNAVAILABLE', 'Toko yang dipilih sudah tidak tersedia.', 422)
+        const storeId = this.value(store, ['store_id', 'id'])
+        const coordinate = this.normalizeCoordinate(
+            this.value(store, ['store_coordinate', 'coordinate', 'store.coordinate', 'address_coordinate']) ||
+            ((this.value(store, ['store_lat', 'latitude', 'lat']) !== null && this.value(store, ['store_long', 'longitude', 'lng', 'long']) !== null)
+                ? `${this.value(store, ['store_lat', 'latitude', 'lat'])},${this.value(store, ['store_long', 'longitude', 'lng', 'long'])}`
+                : null)
+        )
+        if (!storeId || !coordinate) throw new FulfillmentError('STORE_UNAVAILABLE', 'Data toko yang dipilih belum lengkap.', 422)
+        const menu = await this.getStoreMenu(storeSlug)
+        const unavailable = carts.map((cart) => {
+            const item = this.menuForCart(menu, cart)
+            const stock = Number(this.value(item, ['menu_current_quantity', 'current_quantity', 'stock', 'quantity']) || 0)
+            return !item || stock < Number(cart.quantity) ? {
+                cart_id: cart.cart_id, menu_id: cart.menu_id, item_name: cart.item_name,
+                requested_quantity: Number(cart.quantity), available_quantity: item ? stock : 0,
+                reason: item ? 'INSUFFICIENT_STOCK' : 'ITEM_NOT_AVAILABLE'
+            } : null
+        }).filter(Boolean)
+        if (unavailable.length) throw new FulfillmentError('INSUFFICIENT_STOCK', 'Stok produk berubah. Silakan tinjau ulang keranjang.', 409, { unavailable_items: unavailable })
+        const distance = await this.getGoSendDistance(coordinate, addressCoordinate, paymentType)
+        if (distance.upstreamFailed) throw new FulfillmentError('MARKETPLACE_UPSTREAM_ERROR', 'Gagal menghitung jarak pengiriman.', 502)
+        if (distance.distanceKm === null) throw new FulfillmentError('SHIPPING_UNAVAILABLE', 'Jasa pengiriman tidak tersedia untuk alamat ini.', 422)
+        if (distance.distanceKm > this.maxDistanceKm) throw new FulfillmentError('SHIPPING_UNAVAILABLE', 'Alamat berada di luar jangkauan toko yang dipilih.', 422, { distance_km: distance.distanceKm, maximum_distance_km: this.maxDistanceKm })
+        return { store, storeId, storeSlug, coordinate, distanceKm: distance.distanceKm, gosendPayload: distance.payload, menu }
+    }
+
     sign (payload) {
         if (!this.tokenSecret) throw new FulfillmentError('MARKETPLACE_UPSTREAM_ERROR', 'Konfigurasi checkout belum lengkap.', 502)
         const key = crypto.createHash('sha256').update(this.tokenSecret).digest()
