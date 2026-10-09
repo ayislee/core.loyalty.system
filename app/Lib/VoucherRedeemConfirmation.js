@@ -12,6 +12,8 @@ const Point = use('App/Models/Point')
 const PointHistory = use('App/Models/PointHistory')
 const MemberVoucher = use('App/Models/MemberVoucher')
 const VoucherSnapshot = use('App/Helpers/VoucherSnapshot')
+
+const VOUCHER_CATEGORIES = ['offline', 'marketplace']
 const WhatsappAPI = use('App/Lib/WhatsappAPI')
 const BasicEmailService = use('App/Lib/BasicEmailService')
 const Database = use('Database')
@@ -127,6 +129,13 @@ class VoucherRedeemConfirmationService {
     }
 
     async createRequest(member, voucher) {
+        if (!VOUCHER_CATEGORIES.includes(voucher.category)) {
+            return {
+                status: false,
+                code: 'VOUCHER_CATEGORY_REQUIRED',
+                message: 'Voucher belum dikategorikan'
+            }
+        }
         await this.releaseExpiredHolds(member.member_id)
 
         const activeConfirmation = await this.getActiveConfirmation(member.member_id, voucher.voucher_id)
@@ -273,6 +282,15 @@ class VoucherRedeemConfirmationService {
             }
         }
 
+        if (!VOUCHER_CATEGORIES.includes(voucher.category)) {
+            await this.releaseHold(confirmation, 'cancelled')
+            return {
+                status: false,
+                code: 'VOUCHER_CATEGORY_REQUIRED',
+                message: 'Voucher belum dikategorikan'
+            }
+        }
+
         const trx = await Database.beginTransaction()
 
         try {
@@ -318,7 +336,7 @@ class VoucherRedeemConfirmationService {
 
             return {
                 status: true,
-                message: 'Voucher berhasil ditukar',
+                message: 'Voucher berhasil dibeli',
                 data: memberVoucher
             }
         } catch (error) {

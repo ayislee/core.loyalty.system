@@ -10,7 +10,8 @@ class Voucher {
             status: "required|in:active,not active",
 			description: "required",
             duration: "required|number",
-			type: "required|in:free,amount,free_delivery"
+			type: "required|in:free,amount,free_delivery",
+            category: "required|in:offline,marketplace"
 		}
 	}
 
@@ -23,6 +24,8 @@ class Voucher {
             "description.required": "description is required",
             "duration.required": "duration is required",
             "duration.number": "invalid value for duration",
+            "category.required": "voucher category is required",
+            "category.in": "invalid voucher category",
 		}
 	}
 

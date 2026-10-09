@@ -1,4 +1,4 @@
-Buatkan issue-v2-notification.md pada backend-mediacartz yang berisi perencanaan untuk nanti di implementasikan oleh jonior programmer atau ai model yang lebih murah
+Buatkan issue-v2-voucher.md pada core.loyalty.system yang berisi perencanaan untuk nanti di implementasikan oleh jonior programmer atau ai model yang lebih murah
 
 ** struktur folder:
 1. core.loyalty.system = backend loyalty / proxy
@@ -8,36 +8,33 @@ Buatkan issue-v2-notification.md pada backend-mediacartz yang berisi perencanaan
 5. frontend-mediacartz = frontend marketplace untuk backend-mediacartz
 
 ** Scoop Perubahan:
-1. backend-mediacartz = backend marketplace / MARKETPLACE_CORE
+1. core.loyalty.system = backend loyalty / proxy
+2. client.loyalty.system = frontend loyalty customer
+3. backend-mediacartz = backend marketplace / MARKETPLACE_CORE
+4. cms.loyalty.system = frontend management loyalty
 
 ** Latar belakang:
+Saat ini voucher yang dibuat masih tercampur antara voucher untuk offline dan marketplace, tapi pada dasarnya ada voucher yang hanya bisa digunakan untuk offine saja atau marketplace atau keduanya
 
 ** Tujuan:
+memisahkan voucher dibagi hanya mempunyai 2 kategory :
+1. voucher offline
+   voucher ofline hanya bisa di redeem melalui menu penukaran di client dengan menunjukan QR code ke penjaga toko 
+2. voucher marketplace
+   hanya bisa di gunakan saat checkout di marketplace
+
 
 ** Planning nya adalah:
-1. Notifikasi dikirim melalui WhatsApp dan Email Bahwa Telah terjadi Pembayaran berhasil dikirim nomor telpon toko dan email toko
-2. Nomor telepon toko ada di tabel store.store_phone dan store.store_email di database mediacartzdb
-3. Isi content WhatsApp dan Email Sesuaikan dengan kebutuhan, yang ringkas, jelas dan informatif
-4. Notifikasi WhatsApp Gosend yang dikirim ke konsumen saat ini adalah :
-
-   [GOSEND WEBHOOK] Trx cf415bdb-cce1-4095-bd8d-0470403f0a55 (155621) status Mencari kurir -> Menuju pickup. OrderNo: GK-11-3774898. Provider: out_for_pickup. Event: 2026-10-08 12:09:49. Driver: Ecom Tools Driver (+628222045313).
-
-   Perjelas informasinya sehingga informatif, jangan menggunakan [GOSEND WWEBHOOK]
-   cukup misalnya:
-   TRX [transaction_id]
-   Tanggal: 2026-10-08 12:09:49
-   OrderNo: GK-11-3774898
-   Status: Driver Menuju [Nama Toko]
-   Driver: Ecom Tools Driver (+628222045313)
-
-   * diusahakan menggunakan bahasa indonesia
-
-5. Notifikasi WhatsApp Gosend dikirim juga ke WhatsAppp Toko
-6. Notifukasi: 
-   - "Halo Ayi Restudiputra, pembayaran untuk transaksi 182fc7d5-65c6-4ae6-8fb1-a06fb330ed66 sebesar Rp 41.000 berhasil. Terima kasih"
-   ganti transaksi 182fc7d5-65c6-4ae6-8fb1-a06fb330ed66 menjadi transaction_id
-   - "Transaksi retail berhasil dibayar. No: 182fc7d5-65c6-4ae6-8fb1-a06fb330ed66, Store: Freshly Baked by Origin Bakery - Puri, Customer: Ayi Restudiputra, Total: Rp 41.000, Shipping: Instant."
-   Ganti 182fc7d5-65c6-4ae6-8fb1-a06fb330ed66 menjadi transaction_id
+1. tambahkan pada tabel vouchers.category yang isinya enum 'offine','marketplace'. boleh null
+2. sesuaikan di cms.loyalty.system untuk add/edit voucher nya
+3. pada clent.loyalty pada halaman /voucher diilustrasikan pada file core.loyalty.system/docs/img/voucher.png, dimana ada pembagian kategori voucher
+4. pada clent.loyalty pada halaman /vouchers tampilkan jumlah poin milik konsumen seperti illustrasi
+5. Buat halaman /voucher lebih profesional, user friendly, simple, mudah  dimengerti
+6. Saat konsumen melakukan pembelian voucher dengan menggunakan point yang dimilikinya, ilustrasi popup untuk QR Code nya seperti pada file core.loyalty.system/docs/img/voucher-2.png 
+7. apabila konsumen berhasil membeli voucher, tampilkan popup selamat anda berhasil membeli voucher juga ada tombol untuk melihat daftar voucher yang dimiliki konsumen (/redeem)
+8. Pada halaman /redeem prinsipnya mirip dengan halaman /voucher hanya saja content nya adalah data voucher yang dimiliki konsumen
+9. pada halaman /redeeem, tombol tukar hanya untuk kategori offline, sedangkan untuk kategory marketplace diinformasikaan bahwa voucher-voucher ini hanya bisa digunakan saat pembelian di aplikasi ini 
+10. pada halaman /order, apabila konsumen memiliki voucher category marketplace, pada saat pilih voucher akan menampilkan daftar voucher yang dimiliki konsumen
 
 
 

@@ -25,8 +25,40 @@ const Email = use('App/Lib/Email')
 const WhatsappAPI = use('App/Lib/WhatsappAPI')
 const uuid = use('uuid')
 const MemberVoucherLifecycleService = use('App/Services/MemberVoucherLifecycleService')
+const crypto = require('crypto')
+
+const VOUCHER_CATEGORIES = ['offline', 'marketplace']
 
 class MemberController {
+    offlineVoucherQrSecret () {
+        return Env.get('VOUCHER_QR_SECRET') || Env.get('APP_KEY')
+    }
+
+    createOfflineVoucherQrToken (memberVoucherId) {
+        const expiresAt = moment().add(5, 'minutes').unix()
+        const toBase64Url = (value) => Buffer.from(value).toString('base64').replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '')
+        const payload = toBase64Url(JSON.stringify({ member_voucher_id: Number(memberVoucherId), expires_at: expiresAt }))
+        const signature = toBase64Url(crypto.createHmac('sha256', this.offlineVoucherQrSecret()).update(payload).digest())
+        return { token: `v2.${payload}.${signature}`, expires_at: moment.unix(expiresAt).format('YYYY-MM-DD HH:mm:ss') }
+    }
+
+    parseOfflineVoucherQrToken (token) {
+        const [version, payload, signature] = `${token || ''}`.split('.')
+        if (version !== 'v2' || !payload || !signature) return null
+        const expected = crypto.createHmac('sha256', this.offlineVoucherQrSecret()).update(payload).digest('base64url')
+        const expectedBuffer = Buffer.from(expected)
+        const signatureBuffer = Buffer.from(signature)
+        if (expectedBuffer.length !== signatureBuffer.length || !crypto.timingSafeEqual(expectedBuffer, signatureBuffer)) return null
+        try {
+            const base64 = payload.replace(/-/g, '+').replace(/_/g, '/')
+            const parsed = JSON.parse(Buffer.from(base64, 'base64').toString('utf8'))
+            if (!Number.isInteger(Number(parsed.member_voucher_id)) || Number(parsed.expires_at) <= moment().unix()) return null
+            return { member_voucher_id: Number(parsed.member_voucher_id) }
+        } catch (error) {
+            return null
+        }
+    }
+
     generateVerificationToken() {
         return `${Math.floor(Math.random() * (999999 - 100000 + 1)) + 100000}`
     }
@@ -308,10 +340,12 @@ class MemberController {
         // Decrypt
         const now = moment().format('YYYY-MM-DD HH:mm:ss')
         try {
-            var bytes  = CryptoJS.AES.decrypt(request.all().code, request.all().sid);
-            // console.log(bytes)
-            var originalText = bytes.toString(CryptoJS.enc.Utf8);
-            console.log(originalText)
+            const qrToken = this.parseOfflineVoucherQrToken(request.all().code)
+            var originalText = qrToken ? `${qrToken.member_voucher_id}` : ''
+            if (!originalText) {
+                var bytes  = CryptoJS.AES.decrypt(request.all().code, request.all().sid);
+                originalText = bytes.toString(CryptoJS.enc.Utf8);
+            }
             if(originalText === '') throw "500"
             const mv = await MemberVoucher.query()
             .where('member_voucher_id',originalText).where('used','0')
@@ -321,9 +355,17 @@ class MemberController {
             })
             .with('member')
             .first()
+            if (!mv) {
+                return response.json({ status: false, code: 'MEMBER_VOUCHER_USED', message: 'invalid voucher' })
+            }
+            const memberVoucherJson = mv.toJSON()
+            const voucherCategory = memberVoucherJson.voucher_category || memberVoucherJson?.voucher?.category
+            if (voucherCategory !== 'offline') {
+                return response.json({ status: false, code: 'VOUCHER_CHANNEL_MISMATCH', message: 'voucher is not valid for offline redemption' })
+            }
             return response.json({
                 status: true,
-                data: mv
+                data: memberVoucherJson
             })
                 
         } catch (error) {
@@ -911,21 +953,28 @@ class MemberController {
 
         return response.json({
             status: true,
-            data: data
+            data: out
         })
     }
 
     async vouchers({request, response, auth}) {
-        let pid
+        const category = `${request.input('category') || ''}`.trim().toLowerCase()
+        if (category && !VOUCHER_CATEGORIES.includes(category)) {
+            return response.status(422).json({ status: false, code: 'VOUCHER_CATEGORY_INVALID', message: 'invalid voucher category' })
+        }
         const data = Voucher.query()
         .with('partner')
         .where('status','active')        
-        .filter(request.all().filter)
-        .order(request.all().order)
+        if (category) data.where('category', category)
+        else data.whereNotNull('category')
+        data.filter(request.all().filter)
+        data.order(request.all().order)
         const out = await data.paginate(request.all().page, request.all().rows)
+        const point = await Point.query().where('member_id', auth.user.member_id).first()
         return response.json({
             status: true,
-            data: out
+            data: out,
+            member_point: Number(point?.point || 0)
         })
     }
 
@@ -943,6 +992,9 @@ class MemberController {
                 status: false,
                 message: 'invalid voucher'
             })
+        }
+        if (!VOUCHER_CATEGORIES.includes(voucher.category)) {
+            return response.status(422).json({ status: false, code: 'VOUCHER_CATEGORY_REQUIRED', message: 'Voucher belum dikategorikan' })
         }
 
         if(voucher.number_point > point.point) {
@@ -985,6 +1037,9 @@ class MemberController {
                 status: false,
                 message: 'invalid voucher'
             })
+        }
+        if (!VOUCHER_CATEGORIES.includes(voucher.category)) {
+            return response.status(422).json({ status: false, code: 'VOUCHER_CATEGORY_REQUIRED', message: 'Voucher belum dikategorikan' })
         }
 
         const result = await VoucherRedeemConfirmation.createRequest(member, voucher)
@@ -1037,7 +1092,11 @@ class MemberController {
     }
 
     async redeem_voucher({request, response, auth}) {
-        const data = await MemberVoucher.query()
+        const category = `${request.input('category') || ''}`.trim().toLowerCase()
+        if (category && !VOUCHER_CATEGORIES.includes(category)) {
+            return response.status(422).json({ status: false, code: 'VOUCHER_CATEGORY_INVALID', message: 'invalid voucher category' })
+        }
+        const data = MemberVoucher.query()
         .with('voucher', (voucher) => {
             voucher.with('partner')
         })
@@ -1045,11 +1104,37 @@ class MemberController {
         .where('member_id', auth.user.member_id)
         .where('expire_date','>',moment().format('YYYY-MM-DD HH:mm:ss'))
         .where('used','0')
+        if (category) data.where('voucher_category', category)
+        const out = await data
         .paginate(request.all().page, request.all().rows)
         return response.json({
             status: true,
-            data: data
+            data: out
         })
+    }
+
+    async offline_voucher_qr({ request, response, auth }) {
+        const memberVoucherId = Number(request.input('member_voucher_id'))
+        if (!Number.isInteger(memberVoucherId) || memberVoucherId <= 0) {
+            return response.status(422).json({ status: false, message: 'member_voucher_id is required' })
+        }
+
+        const memberVoucher = await MemberVoucher.query()
+            .where('member_voucher_id', memberVoucherId)
+            .where('member_id', auth.user.member_id)
+            .where('used', '0')
+            .where('expire_date', '>', moment().format('YYYY-MM-DD HH:mm:ss'))
+            .with('voucher')
+            .first()
+
+        if (!memberVoucher) return response.status(404).json({ status: false, message: 'Voucher tidak tersedia' })
+        const voucherJson = memberVoucher.toJSON()
+        if ((voucherJson.voucher_category || voucherJson?.voucher?.category) !== 'offline') {
+            return response.status(422).json({ status: false, code: 'VOUCHER_CHANNEL_MISMATCH', message: 'Voucher ini tidak dapat ditukar di outlet' })
+        }
+
+        const qr = this.createOfflineVoucherQrToken(memberVoucherId)
+        return response.json({ status: true, data: { qr_token: qr.token, expires_at: qr.expires_at } })
     }
 
     async voucher_exchange({request, response}){

@@ -4,6 +4,7 @@ const Env = use('Env')
 
 const DISCOUNT_CALCULATION_TYPES = ['fixed_amount', 'percentage']
 const VOUCHER_TYPES = ['free', 'amount', 'free_delivery']
+const VOUCHER_CATEGORIES = ['offline', 'marketplace']
 
 const hasValue = (value) => value !== null && value !== undefined && String(value).trim() !== ''
 
@@ -31,6 +32,7 @@ class VoucherSnapshot {
             partner_id: voucher && voucher.partner_id ? voucher.partner_id : null,
             voucher_name_snapshot: voucher && voucher.name ? voucher.name : null,
             voucher_type: voucherType,
+            voucher_category: voucher && VOUCHER_CATEGORIES.includes(voucher.category) ? voucher.category : null,
             discount_calculation_type: null,
             discount_value: null,
             redeemed_point: redeemedPoint,
@@ -69,6 +71,7 @@ class VoucherSnapshot {
         const payload = this.toMemberVoucherPayload(voucher)
 
         memberVoucher.voucher_type = payload.voucher_type
+        memberVoucher.voucher_category = payload.voucher_category
         memberVoucher.partner_id = payload.partner_id
         memberVoucher.voucher_name_snapshot = payload.voucher_name_snapshot
         memberVoucher.discount_calculation_type = payload.discount_calculation_type

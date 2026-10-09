@@ -68,6 +68,8 @@ class MemberVoucherLifecycleService {
             .first()
 
         if (!voucher) throw new Error('voucher not available for this partner')
+        const category = memberVoucher.voucher_category || voucher.category
+        if (category !== 'marketplace') throw new Error('voucher channel mismatch')
         return memberVoucher
     }
 

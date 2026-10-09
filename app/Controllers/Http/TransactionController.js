@@ -205,6 +205,15 @@ class TransactionController {
             }
 
             const memberVoucherJson = memberVoucher.toJSON()
+            const voucherCategory = memberVoucherJson.voucher_category || memberVoucherJson?.voucher?.category
+
+            if (voucherCategory !== 'marketplace') {
+                return {
+                    status: false,
+                    code: 'VOUCHER_CHANNEL_MISMATCH',
+                    message: 'Voucher ini hanya dapat digunakan sesuai kategorinya'
+                }
+            }
             const voucherCompanySlug = normalizeCompanySlug(memberVoucherJson?.voucher?.partner?.company_slug)
 
             if (!voucherCompanySlug || voucherCompanySlug !== normalizedCompanySlug) {
@@ -223,7 +232,8 @@ class TransactionController {
 
             return {
                 status: true,
-                member_voucher_id: memberVoucherId
+                member_voucher_id: memberVoucherId,
+                voucher_category: voucherCategory
             }
         } catch (error) {
             return {

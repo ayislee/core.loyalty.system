@@ -171,6 +171,7 @@ class VoucherController {
         voucher.created_by = auth.user.user_id
         voucher.updated_by = auth.user.user_id
         voucher.type = discountPayload.voucherType
+        voucher.category = req.category
         voucher.discount_calculation_type = discountPayload.discountCalculationType
         voucher.discount_value = discountPayload.discountValue
 
@@ -226,6 +227,7 @@ class VoucherController {
         data.description = hasValue(req.description) ? req.description : data.description
         data.duration = hasValue(req.duration) ? req.duration : data.duration
         data.type = discountPayload.voucherType
+        data.category = hasValue(req.category) ? req.category : data.category
         data.discount_calculation_type = discountPayload.discountCalculationType
         data.discount_value = discountPayload.discountValue
         data.updated_by = auth.user.user_id

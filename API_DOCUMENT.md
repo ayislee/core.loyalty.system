@@ -1907,3 +1907,13 @@ Aktif hanya saat `NODE_ENV=development`.
 5. `POST /api/v1/premium/send` -> `PremiumController` tidak ditemukan.
 6. `GET/POST /api/v1/livechat/` -> `LivechatController` tidak ditemukan.
 
+# Voucher category V2
+
+Voucher loyalty memakai `category` dengan nilai `offline` atau `marketplace`. Field ini berbeda dari `type` benefit voucher (`free`, `amount`, atau `free_delivery`). Voucher master dengan category `null` adalah data legacy dan tidak dapat dibeli baru.
+
+- `GET /api/v1/member/vouchers?category=offline|marketplace` mengembalikan katalog voucher per kategori beserta `member_point`.
+- `GET /api/v1/member/redeem/voucher?category=offline|marketplace` mengembalikan voucher aktif milik member per kategori.
+- `POST /api/v1/member/vouchers/purchase/request` dan `POST /api/v1/member/vouchers/purchase/verify` adalah endpoint canonical pembelian voucher menggunakan poin; route `redeem/request` dan `redeem/verify` tetap kompatibel.
+- `POST /api/v1/member/redeem/offline-qr` dengan `member_voucher_id` hanya menerima voucher offline dan mengembalikan QR token sementara.
+- Voucher kategori `marketplace` saja yang dapat dipakai saat checkout marketplace. Voucher offline ditolak dengan `VOUCHER_CHANNEL_MISMATCH`.
+
