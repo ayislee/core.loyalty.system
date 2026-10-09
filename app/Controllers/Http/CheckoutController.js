@@ -217,6 +217,12 @@ class CheckoutController {
             })
             const responseData = this.quoteResponseData({ token, address: context.address, preview: previewResult.data.data || previewResult.data, paymentGateway })
             responseData.provider_store_name = context.cartStore.store_name || selectedStore.store?.store_name || selectedStore.store_name || null
+            responseData.fulfillment = {
+                store_id: selectedStore.storeId,
+                store_name: responseData.provider_store_name,
+                distance_km: selectedStore.distanceKm,
+                maximum_distance_km: context.service.maxDistanceKm
+            }
             responseData.shipping_options = shippingOptions
             responseData.selected = { ...responseData.selected, shipping_service: selectedShipping.service }
             return response.json({ status: true, message: 'Checkout quote berhasil dibuat', data: responseData })
