@@ -944,7 +944,7 @@ class MemberController {
 
 
     async points({request, response, auth}) {
-        const data = await PointHistory.query()
+        const data = PointHistory.query()
         .where('member_id',auth.user.member_id)
         .filter(request.all().filter)
         .order(request.all().order)
