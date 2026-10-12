@@ -1,4 +1,4 @@
-Buatkan issue-v2-voucher.md pada core.loyalty.system yang berisi perencanaan untuk nanti di implementasikan oleh jonior programmer atau ai model yang lebih murah
+Buatkan issue-v2-balance.md pada core.loyalty.system yang berisi perencanaan untuk nanti di implementasikan oleh jonior programmer atau ai model yang lebih murah
 
 ** struktur folder:
 1. core.loyalty.system = backend loyalty / proxy
@@ -8,34 +8,32 @@ Buatkan issue-v2-voucher.md pada core.loyalty.system yang berisi perencanaan unt
 5. frontend-mediacartz = frontend marketplace untuk backend-mediacartz
 
 ** Scoop Perubahan:
-1. core.loyalty.system = backend loyalty / proxy
-2. client.loyalty.system = frontend loyalty customer
-3. backend-mediacartz = backend marketplace / MARKETPLACE_CORE
-4. cms.loyalty.system = frontend management loyalty
+1. client.loyalty.system = frontend loyalty customer
+2. core.loyalty.system = backend loyalty / proxycore.loyalty.system = backend loyalty / proxy
+3. cms.loyalty.system = frontend management loyalty
+4. backend-mediacartz = backend marketplace / MARKETPLACE_CORE (bila diperlukan)
 
 ** Latar belakang:
-Saat ini voucher yang dibuat masih tercampur antara voucher untuk offline dan marketplace, tapi pada dasarnya ada voucher yang hanya bisa digunakan untuk offine saja atau marketplace atau keduanya
+saat ini, belum ada procedure apabila terjadi kegagalan transaksi saat konsumen telah berhasil melakukan pembayaran. Misalnya kegagalan kirim mengirimkan barang atau konsumen mengkomplain barang yang diterima nya atau kondisi lain nya
 
 ** Tujuan:
-memisahkan voucher dibagi hanya mempunyai 2 kategory :
-1. voucher offline
-   voucher ofline hanya bisa di redeem melalui menu penukaran di client dengan menunjukan QR code ke penjaga toko 
-2. voucher marketplace
-   hanya bisa di gunakan saat checkout di marketplace
+1. Ada Fitur Balance yang dimiliki konsumen,
+2. Apabila terjadi kegagalan pengiriman kurir, maka pengembalian pembelian di kembalikan melalui Balance konsumen
+3. Pengembalian dikurangi Biaya kurir
+4. voucher dikembalikan apabila terjadi kegagalan transaksi
+5. balance bisa di withdraw
+6. balance hanya bisa di gunakan sebagai alat pembayaran di marketplace
+7. Pembayaran di marketplace bisa di slit antara QRIS dengan balance apabila nilai balance tidak mencukupi untuk pembayaran di transaksi baru
+8. Informasi balance ada di database core.loyalty.system
+9. Saat konsumen melakukan withdraw, dikiri 
 
 
 ** Planning nya adalah:
-1. tambahkan pada tabel vouchers.category yang isinya enum 'offine','marketplace'. boleh null
-2. sesuaikan di cms.loyalty.system untuk add/edit voucher nya
-3. pada clent.loyalty pada halaman /voucher diilustrasikan pada file core.loyalty.system/docs/img/voucher.png, dimana ada pembagian kategori voucher
-4. pada clent.loyalty pada halaman /vouchers tampilkan jumlah poin milik konsumen seperti illustrasi
-5. Buat halaman /voucher lebih profesional, user friendly, simple, mudah  dimengerti
-6. Saat konsumen melakukan pembelian voucher dengan menggunakan point yang dimilikinya, ilustrasi popup untuk QR Code nya seperti pada file core.loyalty.system/docs/img/voucher-2.png 
-7. apabila konsumen berhasil membeli voucher, tampilkan popup selamat anda berhasil membeli voucher juga ada tombol untuk melihat daftar voucher yang dimiliki konsumen (/redeem)
-8. Pada halaman /redeem prinsipnya mirip dengan halaman /voucher hanya saja content nya adalah data voucher yang dimiliki konsumen
-9. pada halaman /redeeem, tombol tukar hanya untuk kategori offline, sedangkan untuk kategory marketplace diinformasikaan bahwa voucher-voucher ini hanya bisa digunakan saat pembelian di aplikasi ini 
-10. pada halaman /order, apabila konsumen memiliki voucher category marketplace, pada saat pilih voucher akan menampilkan daftar voucher yang dimiliki konsumen
-
+1. Saat komsumen melakukan checkout di halaman product, halaman /order, konsumen melakukan pengaturan metoda pembayaran, alamat pengiriman, catatan untk kurir dan lain-lain.
+tombol "Tinjau Pesanan" Ganti menjadi "Bayar"
+2. Tambahkan ceklist Syarat dan ketentuan yang menandakan konsumen setuju, kalau di cek, berarti tombol "Bayar" Aktiv (Bisa di klik)
+3. Saat mengklik tombol bayar, langsung melakukan verifikasi ke core.loyalty.system di page itu juga dengan mengmanggil member/transaction, dengan preview_fee=true,
+apabila respon dari core.loyalty.system sama dengan dari halaman /order, maka langsung hit ulang member/transaction, dengan preview_fee=false, untuk mengcreate transaksi dan mendapatkan QRCODE, dan langsung QRCODE nya di tampilkan mirip popup yang ada di halaman /order/preorder supaya konsumen melakukan pembayaran
 
 
 

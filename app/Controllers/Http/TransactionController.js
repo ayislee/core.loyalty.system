@@ -651,7 +651,7 @@ class TransactionController {
                 store_slug: storeSlug,
                 company_slug: checkoutCompanySlug,
                 voucher_code: req.voucher_code,
-                ms_payment_id: Env.get('MARKETPLACE_CORE_PAYMENT_ID') || Env.get('MS_PAYMENT_ID') || 4,
+                ms_payment_id: req.ms_payment_id || Env.get('MARKETPLACE_CORE_PAYMENT_ID') || Env.get('MS_PAYMENT_ID') || 4,
                 ms_delivery_id: req.ms_delivery_id,
                 preview_fee: req.preview_fee,
                 customer_name:`${auth.user.firstname?auth.user.firstname:'John'} ${auth.user.lastname?' '+auth.user.lastname:'Doe'}`,
@@ -676,9 +676,26 @@ class TransactionController {
             if(req.voucher_code){
                 params.voucher_type = "loyalty"
             }
-            // return response.json(params)
-            console.log("params",params)
-            const res = await axios.post(Env.get('MARKETPLACE_CORE')+'transaction/retail/order',params)
+            const marketplaceOrderUrl = `${Env.get('MARKETPLACE_CORE')}transaction/retail/order`
+            const signatureSecret = Env.get('MARKETPLACE_CORE_SIGNATURE_SECRET')
+            if (!signatureSecret) {
+                return response.status(502).json({
+                    status: false,
+                    code: 'MARKETPLACE_CORE_SIGNATURE_NOT_CONFIGURED',
+                    message: 'Konfigurasi koneksi payment gateway marketplace belum lengkap.'
+                })
+            }
+            const timestamp = `${Math.floor(Date.now() / 1000)}`
+            const path = new URL(marketplaceOrderUrl).pathname
+            const bodyHash = crypto.createHash('sha256').update(JSON.stringify(params)).digest('hex')
+            const signaturePayload = `POST\n${path}\n${timestamp}\n${bodyHash}`
+            const res = await axios.post(marketplaceOrderUrl, params, {
+                headers: {
+                    'x-marketplace-source': 'CORE_LOYALTY',
+                    'x-marketplace-timestamp': timestamp,
+                    'x-marketplace-signature': crypto.createHmac('sha256', signatureSecret).update(signaturePayload).digest('hex')
+                }
+            })
             if(req.preview_fee){
                 return response.json(res.data)
             }else{
@@ -693,7 +710,8 @@ class TransactionController {
                     return response.json({
                         status: true,
                         data: res.data.data,
-                        token: res.data.token
+                        token: res.data.token,
+                        payment_gateway: res.data?.data?.payment_gateway || res.data?.payment_gateway || null
                     })
                 }else{
     
@@ -708,10 +726,11 @@ class TransactionController {
 
             
         } catch (error) {
-            console.log(error)
-            return response.json({
+            const upstream = error?.response?.data || {}
+            return response.status(Number(error?.response?.status) || 502).json({
                 status: false,
-                message: error.message
+                code: upstream.code || upstream.error || 'MARKETPLACE_ORDER_FAILED',
+                message: upstream.message || upstream.error || error.message
             })
         }
     }
