@@ -1768,7 +1768,7 @@ Prefix: `/api/v1/public`
 - Controller: `ProductController.publicBestSellers`
 - Query:
   - `store_slug` (opsional; jika kosong menggunakan `DEFAULT_STORE_SLUG`)
-- Mengembalikan maksimal 8 produk retail terlaris perusahaan yang tersedia pada toko aktif. Periode dimulai tujuh hari sebelum transaksi retail berhasil terakhir dan tidak dihitung dari waktu request.
+- Mengembalikan maksimal 8 produk retail terlaris perusahaan yang tersedia pada toko aktif, dalam urutan `rank` menaik. Periode dimulai tujuh hari sebelum transaksi retail berhasil terakhir dan tidak dihitung dari waktu request.
 - Response sukses:
 
 ```json
@@ -1786,9 +1786,16 @@ Prefix: `/api/v1/public`
         "item_slug": "sourdough-country-style",
         "menu_slug": "sourdough-country-style-freshly-baked-by-origin-bakery-jakarta-barat",
         "image_url": "https://cdn.example.com/product.jpg",
+        "menu_regular_price": 40000,
+        "menu_discount_marketplace_price": 35000,
+        "has_marketplace_discount": true,
         "current_price": 35000,
         "stock": 12,
-        "sold_quantity": 207
+        "sold_quantity": 207,
+        "review_summary": {
+          "average": 4.7,
+          "total": 18
+        }
       }
     ]
   }

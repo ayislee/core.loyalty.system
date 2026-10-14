@@ -691,27 +691,29 @@ class ProductController {
 
             const upstreamData = await upstreamRequest
             const products = Array.isArray(upstreamData?.products) ? upstreamData.products : []
+            const bestSellerProducts = products.map((product) => ({
+                rank: Number(product?.rank) || 0,
+                menu_id: product?.menu_id,
+                item_id: product?.item_id,
+                item_name: product?.item_name || 'Produk tanpa nama',
+                item_slug: product?.item_slug || product?.menu_slug || '',
+                menu_slug: product?.menu_slug || '',
+                image_url: Array.isArray(product?.item_image) ? product.item_image[0] : product?.item_image,
+				menu_regular_price: Number(product?.menu_regular_price) || 0,
+				menu_discount_marketplace_price: product?.menu_discount_marketplace_price ?? null,
+				has_marketplace_discount: Boolean(product?.has_marketplace_discount),
+                current_price: Number(product?.current_price) || 0,
+                stock: Number(product?.menu_current_quantity) || 0,
+                sold_quantity: Number(product?.sold_quantity) || 0
+            })).filter((product) => product.menu_id && product.item_slug)
+            const productsWithReviews = await this._appendReviewSummaries(bestSellerProducts)
 
             return response.json({
                 status: true,
                 data: {
                     period_start: upstreamData?.period_start || null,
                     period_end: upstreamData?.period_end || null,
-                    products: products.map((product) => ({
-                        rank: Number(product?.rank) || 0,
-                        menu_id: product?.menu_id,
-                        item_id: product?.item_id,
-                        item_name: product?.item_name || 'Produk tanpa nama',
-                        item_slug: product?.item_slug || product?.menu_slug || '',
-                        menu_slug: product?.menu_slug || '',
-                        image_url: Array.isArray(product?.item_image) ? product.item_image[0] : product?.item_image,
-						menu_regular_price: Number(product?.menu_regular_price) || 0,
-						menu_discount_marketplace_price: product?.menu_discount_marketplace_price ?? null,
-						has_marketplace_discount: Boolean(product?.has_marketplace_discount),
-                        current_price: Number(product?.current_price) || 0,
-                        stock: Number(product?.menu_current_quantity) || 0,
-                        sold_quantity: Number(product?.sold_quantity) || 0
-                    })).filter((product) => product.menu_id && product.item_slug)
+                    products: productsWithReviews
                 }
             })
         } catch (error) {

@@ -339,6 +339,8 @@ class MemberController {
         // return request.all()
         // Decrypt
         const now = moment().format('YYYY-MM-DD HH:mm:ss')
+        const voucherChannel = `${request.input('channel') || 'offline'}`.trim().toLowerCase()
+        const expectedVoucherCategory = voucherChannel === 'marketplace' ? 'marketplace' : 'offline'
         try {
             const qrToken = this.parseOfflineVoucherQrToken(request.all().code)
             var originalText = qrToken ? `${qrToken.member_voucher_id}` : ''
@@ -360,8 +362,9 @@ class MemberController {
             }
             const memberVoucherJson = mv.toJSON()
             const voucherCategory = memberVoucherJson.voucher_category || memberVoucherJson?.voucher?.category
-            if (voucherCategory !== 'offline') {
-                return response.json({ status: false, code: 'VOUCHER_CHANNEL_MISMATCH', message: 'voucher is not valid for offline redemption' })
+            if (voucherCategory !== expectedVoucherCategory) {
+                const channelLabel = expectedVoucherCategory === 'marketplace' ? 'marketplace checkout' : 'offline redemption'
+                return response.json({ status: false, code: 'VOUCHER_CHANNEL_MISMATCH', message: `voucher is not valid for ${channelLabel}` })
             }
             return response.json({
                 status: true,

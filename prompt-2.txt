@@ -1,0 +1,31 @@
+Buatkan issue-v2-best-seller.md pada core.loyalty.system yang berisi perencanaan untuk nanti di implementasikan oleh jonior programmer atau ai model yang lebih murah
+
+** struktur folder:
+1. core.loyalty.system = backend loyalty / proxy
+2. client.loyalty.system = frontend loyalty customer
+3. cms.loyalty.system = frontend management loyalty
+4. backend-mediacartz = backend marketplace / MARKETPLACE_CORE
+5. frontend-mediacartz = frontend marketplace untuk backend-mediacartz
+
+** Scoop Perubahan:
+1. client.loyalty.system = frontend loyalty customer
+2. core.loyalty.system = backend loyalty / proxycore.loyalty.system = backend loyalty / proxy
+3. backend-mediacartz = backend marketplace / MARKETPLACE_CORE (bila diperlukan)
+
+** Latar belakang:
+Saat product terlaris  di /products ditampilkan sebagai carousel hanya sebatas informasi berapa yang terjual
+
+** Tujuan:
+1. mengganti tab kategory "SEMUA" menjadi produk terlaris
+2. menghilangkan Product Terlaris yang berupa corousel
+
+** Planning nya adalah:
+1. Hilang kan corousel slide product terlaris
+2. Tab Caregory "SEMUA" yang menampilkan semua product Ganti Menjadi "Produk Terlaris"
+3. Isi data Tab Category Produk terlaris adalah daftar produk terlaris yang sekarang adalah
+4. Tab Produk Terlaris Style nya sama dengan Category lain yang bisa langsung masuk keranjang
+
+
+
+**  buat issue secara detail termasuk kira-kira apa saja file yang harus di modifikasi atau di create
+** jangan buatkan terlalu detain instruksi unit test nya. buatkan saja skenario apa yang harus di test, biarkan yang mengimplementasi detail skenarionya adalah junior programer atau model ai yang lebih murah
