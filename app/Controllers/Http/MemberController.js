@@ -25,6 +25,7 @@ const Email = use('App/Lib/Email')
 const WhatsappAPI = use('App/Lib/WhatsappAPI')
 const uuid = use('uuid')
 const MemberVoucherLifecycleService = use('App/Services/MemberVoucherLifecycleService')
+const GlobalVoucherService = use('App/Services/GlobalVoucherService')
 const crypto = require('crypto')
 
 const VOUCHER_CATEGORIES = ['offline', 'marketplace']
@@ -1114,6 +1115,22 @@ class MemberController {
             status: true,
             data: out
         })
+    }
+
+    async global_vouchers ({ request, response }) {
+        const companySlug = request.input('company_slug')
+        const items = request.input('items') || []
+        const data = await GlobalVoucherService.listEligible({ companySlug, items: Array.isArray(items) ? items : [] })
+        return response.json({ status: true, data })
+    }
+
+    async validate_global_voucher ({ request, response }) {
+        const result = await GlobalVoucherService.findEligible({
+            voucherId: request.input('voucher_id'),
+            companySlug: request.input('company_slug'),
+            items: request.input('items') || []
+        })
+        return response.status(result.status ? 200 : 422).json(result)
     }
 
     async offline_voucher_qr({ request, response, auth }) {

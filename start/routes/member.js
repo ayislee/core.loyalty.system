@@ -23,6 +23,7 @@ Route.group(()=>{
     Route.post('/vouchers/purchase/request','MemberController.request_redeem').validator('VoucherID')
     Route.post('/vouchers/purchase/verify','MemberController.verify_redeem')
     Route.get('/redeem/voucher','MemberController.redeem_voucher').validator('Pages')
+    Route.get('/checkout/global-vouchers','MemberController.global_vouchers')
     Route.post('/redeem/offline-qr','MemberController.offline_voucher_qr')
     Route.get('/partner','PartnerController.all').validator('Pages')
     Route.get('/partner/detail','PartnerController.detail').validator('PartnerID')

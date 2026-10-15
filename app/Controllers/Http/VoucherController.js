@@ -6,6 +6,19 @@ const ThisLib = use('App/Lib/LoyaltyLib')
 const DISCOUNT_CALCULATION_TYPES = ['fixed_amount', 'percentage']
 const VOUCHER_TYPES = ['free', 'amount', 'free_delivery']
 
+const normalizeGlobalPeriod = (req) => {
+    if (req.category !== 'global') return { status: true, start: null, end: null }
+    const start = String(req.global_start_date || '').trim()
+    const end = String(req.global_end_date || '').trim()
+    const startTime = new Date(start).getTime()
+    const endTime = new Date(end).getTime()
+    if (!start || !end || Number.isNaN(startTime) || Number.isNaN(endTime)) {
+        return { status: false, message: 'global_start_date and global_end_date are required for global voucher' }
+    }
+    if (startTime > endTime) return { status: false, message: 'global_start_date must be before global_end_date' }
+    return { status: true, start, end }
+}
+
 const hasValue = (value) => {
     return value !== undefined && value !== null && `${value}`.trim() !== ''
 }
@@ -151,12 +164,14 @@ class VoucherController {
     async create({request, response, auth}) {
         const req = request.all()
         const discountPayload = normalizeDiscountPayload(req)
+        const globalPeriod = normalizeGlobalPeriod(req)
         if (!discountPayload.status) {
             return response.json({
                 status: false,
                 message: discountPayload.message
             })
         }
+        if (!globalPeriod.status) return response.status(422).json(globalPeriod)
 
         let pid
         const voucher = new Voucher()
@@ -174,6 +189,8 @@ class VoucherController {
         voucher.category = req.category
         voucher.discount_calculation_type = discountPayload.discountCalculationType
         voucher.discount_value = discountPayload.discountValue
+        voucher.global_start_date = globalPeriod.start
+        voucher.global_end_date = globalPeriod.end
 
         if(auth.user.type === 'admin'){
             voucher.partner_id = req.partner_id
@@ -209,12 +226,19 @@ class VoucherController {
         }
 
         const discountPayload = normalizeDiscountPayload(req, data)
+        const globalPeriod = normalizeGlobalPeriod({
+            ...req,
+            category: hasValue(req.category) ? req.category : data.category,
+            global_start_date: Object.prototype.hasOwnProperty.call(req, 'global_start_date') ? req.global_start_date : data.global_start_date,
+            global_end_date: Object.prototype.hasOwnProperty.call(req, 'global_end_date') ? req.global_end_date : data.global_end_date
+        })
         if (!discountPayload.status) {
             return response.json({
                 status: false,
                 message: discountPayload.message
             })
         }
+        if (!globalPeriod.status) return response.status(422).json(globalPeriod)
 
         data.name = hasValue(req.name) ? req.name : data.name
         if (Object.prototype.hasOwnProperty.call(req, 'sku')) {
@@ -230,6 +254,8 @@ class VoucherController {
         data.category = hasValue(req.category) ? req.category : data.category
         data.discount_calculation_type = discountPayload.discountCalculationType
         data.discount_value = discountPayload.discountValue
+        data.global_start_date = globalPeriod.start
+        data.global_end_date = globalPeriod.end
         data.updated_by = auth.user.user_id
         await data.save()
 

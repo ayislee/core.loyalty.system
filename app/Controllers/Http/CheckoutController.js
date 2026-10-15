@@ -107,7 +107,9 @@ class CheckoutController {
             store_slug: selection.storeSlug,
             company_slug: selection.companySlug,
             voucher_code: request.voucher_code || null,
-            voucher_type: request.voucher_code ? 'loyalty' : undefined,
+            voucher_type: request.voucher_code
+                ? (String(request.voucher_code).startsWith('global:') ? 'loyalty_global' : 'loyalty')
+                : undefined,
             ms_payment_id: request.ms_payment_id,
             ms_delivery_id: request.ms_delivery_id || null,
             shipping_service: request.shipping_service || null,
@@ -213,6 +215,7 @@ class CheckoutController {
 				items: context.carts.map((cart) => ({ cart_id: cart.cart_id, menu_id: cart.menu_id || null, item_id: cart.item_id, quantity: Number(cart.quantity), note: cart.note || null })),
                 ms_payment_id: paymentGateway.ms_payment_id, payment_gateway_identifier: paymentGateway.identifier, ms_delivery_id: req.ms_delivery_id || null,
                 shipping_service: selectedShipping.service, voucher_code: req.voucher_code || null,
+                voucher_type: req.voucher_code ? (String(req.voucher_code).startsWith('global:') ? 'loyalty_global' : 'loyalty') : null,
                 client_request_id: req.client_request_id || null, expires_at: expiresAt
             })
             const responseData = this.quoteResponseData({ token, address: context.address, preview: previewResult.data.data || previewResult.data, paymentGateway })

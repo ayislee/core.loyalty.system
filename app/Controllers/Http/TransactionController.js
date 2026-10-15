@@ -5,6 +5,7 @@ const Transaction = use('App/Models/Transaction')
 const Partner = use('App/Models/Partner')
 const Address = use('App/Models/Address')
 const MemberVoucher = use('App/Models/MemberVoucher')
+const GlobalVoucherService = use('App/Services/GlobalVoucherService')
 const ProductReviewEligibility = use('App/Helpers/ProductReviewEligibility')
 const qs = use('qs')
 const moment = use('moment')
@@ -157,6 +158,15 @@ class TransactionController {
     async validateVoucherCompany({ voucherCode, checkoutCompanySlug, memberId, items = [] }) {
         if (!voucherCode) {
             return { status: true }
+        }
+
+        const globalVoucherMatch = /^global:(\d+)$/.exec(String(voucherCode))
+        if (globalVoucherMatch) {
+            return GlobalVoucherService.findEligible({
+                voucherId: Number(globalVoucherMatch[1]),
+                companySlug: checkoutCompanySlug,
+                items
+            })
         }
 
         const normalizedCompanySlug = normalizeCompanySlug(checkoutCompanySlug)
@@ -674,7 +684,7 @@ class TransactionController {
                 params.transaction_delivery_note = transactionDeliveryNote
             }
             if(req.voucher_code){
-                params.voucher_type = "loyalty"
+                params.voucher_type = String(req.voucher_code).startsWith('global:') ? "loyalty_global" : "loyalty"
             }
             const marketplaceOrderUrl = `${Env.get('MARKETPLACE_CORE')}transaction/retail/order`
             const signatureSecret = Env.get('MARKETPLACE_CORE_SIGNATURE_SECRET')

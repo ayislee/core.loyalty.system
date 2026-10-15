@@ -1,0 +1,32 @@
+Buatkan issue-v2-global-voucher.md pada core.loyalty.system yang berisi perencanaan untuk nanti di implementasikan oleh jonior programmer atau ai model yang lebih murah
+
+** struktur folder:
+1. core.loyalty.system = backend loyalty / proxy
+2. client.loyalty.system = frontend loyalty customer
+3. cms.loyalty.system = frontend management loyalty
+4. backend-mediacartz = backend marketplace / MARKETPLACE_CORE
+5. frontend-mediacartz = frontend marketplace untuk backend-mediacartz
+
+** Scoop Perubahan:
+1. client.loyalty.system = frontend loyalty customer
+2. core.loyalty.system = backend loyalty / proxycore.loyalty.system = backend loyalty / proxy
+3. cms.loyalty.system = frontend management loyalty
+4. backend-mediacartz = backend marketplace / MARKETPLACE_CORE (bila diperlukan)
+
+** Latar belakang:
+Saat ini voucher yang bisa digunakan customer adalah voucher yang dimiliki konsumen, diperlukan global voucher yang bisa gunakan semua customer selama global voucher itu masih berlaku, contohnya gratis ongkos kirim
+
+** Tujuan:
+membuat global voucher yang bisa digunakan customer selama periode tertentu
+
+** Planning nya adalah:
+1. pada tabel voucher, category "global"
+2. tambahkan field global_start_date dan global_end_date untuk menentukan masa berlaku voucher
+3. Voucher kategori "global" ini hanya berlaku untuk pembelanjaan di marketplace
+4. sesuaikan API create dan update voucher 
+5. Sesuaikan di cms.loyalty.system mengenai perubahan voucher ini untuk CRUD nya
+6. Implementasikan di client.loyalty, saat checkout, secara otomatis ada pilihan voucher global tanpa perlu dimiliki oleh konsumen voucher nya sesuai tanggal berlaku nya
+
+
+**  buat issue secara detail termasuk kira-kira apa saja file yang harus di modifikasi atau di create
+** jangan buatkan terlalu detain instruksi unit test nya. buatkan saja skenario apa yang harus di test, biarkan yang mengimplementasi detail skenarionya adalah junior programer atau model ai yang lebih murah

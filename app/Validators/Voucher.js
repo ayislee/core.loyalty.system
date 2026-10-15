@@ -11,7 +11,7 @@ class Voucher {
 			description: "required",
             duration: "required|number",
 			type: "required|in:free,amount,free_delivery",
-            category: "required|in:offline,marketplace"
+category: "required|in:offline,marketplace,global"
 		}
 	}
 
