@@ -1,44 +1,174 @@
-Buatkan issue-v2-balance.md pada core.loyalty.system yang berisi perencanaan untuk nanti di implementasikan oleh jonior programmer atau ai model yang lebih murah
+Buatkan issue-v2-order.md pada core.loyalty.system yang berisi perencanaan untuk nanti di implementasikan oleh jonior programmer atau ai model yang lebih murah
 
 ** struktur folder:
 1. core.loyalty.system = backend loyalty / proxy
 2. client.loyalty.system = frontend loyalty customer
 3. cms.loyalty.system = frontend management loyalty
 4. backend-mediacartz = backend marketplace / MARKETPLACE_CORE
-5. frontend-mediacartz = frontend marketplace untuk backend-mediacartz
+5. frontend-mediacartz-react = frontend marketplace untuk backend-mediacartz
 
 ** Scoop Perubahan:
-1. client.loyalty.system = frontend loyalty customer
-2. core.loyalty.system = backend loyalty / proxycore.loyalty.system = backend loyalty / proxy
-3. cms.loyalty.system = frontend management loyalty
-4. backend-mediacartz = backend marketplace / MARKETPLACE_CORE (bila diperlukan)
+1. client.loyalty.system = frontend loyalty customer (apabila diperlukan)
+2. core.loyalty.system = backend loyalty / proxy
+3. backend-mediacartz = backend marketplace / MARKETPLACE_CORE
 
 ** Latar belakang:
-saat ini, belum ada procedure apabila terjadi kegagalan transaksi saat konsumen telah berhasil melakukan pembayaran. Misalnya kegagalan kirim mengirimkan barang atau konsumen mengkomplain barang yang diterima nya atau kondisi lain nya
 
 ** Tujuan:
-1. Ada Fitur Balance/Saldo yang dimiliki konsumen,
-2. Apabila terjadi kegagalan pengiriman kurir, maka pengembalian pembelian di kembalikan melalui Balance/Saldo konsumen
-3. Pengembalian dikurangi Biaya kurir
-4. voucher dikembalikan apabila terjadi kegagalan transaksi
-5. balance/Saldo bisa di withdraw
-6. balance hanya bisa di gunakan sebagai alat pembayaran di marketplace
-7. Pembayaran di marketplace bisa di slit antara QRIS dengan balance/saldo apabila nilai balance tidak mencukupi untuk pembayaran di transaksi baru
-8. Informasi balance ada di database core.loyalty.system
-9. Saat konsumen melakukan withdraw, dikirim email kepada user dengan type finance 
-
+halaman /order quantity product bisa di ubah
 
 ** Planning nya adalah:
-a. core.loyalty.system:
-1. Buatkan tabel member_balance yang tujuan nya untuk mencatat keluar masuk balance member
-2. Buatkan API-API yang berhubungan dengan Balance Member, baik pengisian balance, pengurangan, balance, withdraw dan api lain yang diperlukan
-3. Buatkan tabel request_withdraw
-4. Saat Member mengajukan request withdraw Saldo
+1. Pada halaman /order, tambahkan [-] [Quantity] [+]
+2. saat quantity bearubah, secara otomatis hitung ulang semua nilai
+3. pilihan "Onkos kirim" Hanya menampilkan Instant
+4. Saat Popup QRIS, text tombol "Tutup" Berarna Putih
+5. Durasi pembayaran ubah ke 1 jam (60 menit) 
+6. pada popup pembayaran QRIS tambahkan Informasi:
+"Mengalami kendala pembayaran atau status masih pending setelah membayar? [Hubungi kami di sini]"
+[Hubungi kami disini] di link membuka whatapps ke nomor toko
+7. Template Notifikasi WhatsApp:
 
-b. client.loyalty.system:
-1. tampilkan balace/Saldo di halaman /profile, dibawah "Total Point Anda"
-2. Pada Bagian "Akses Cepat", tambahkan tombol Riwayat Saldo 
+## Pembayaran Berhasil  ke Pembeli:
+-------------------------------
+Hai, Kak! 
+Pembayaran pesanan Kakak berhasil diterima.
 
+🧾 No. Transaksi: #[transaksion_id]
+💰 Total Pembayaran: [Total Pembayaran]
+🚚 Pengiriman: [Instant]
+
+Pesanan Kakak sedang diproses. Terima kasih sudah berbelanja di [Nama Company/Perusahaan]! 
+
+Pesan otomatis: Mohon tidak membalas pesan ini karena WhatsApp ini hanya digunakan untuk mengirim notifikasi.
+Jika membutuhkan bantuan, silakan hubungi [Nomor Toko].
+
+
+## Pembayaran Berhasil  ke Toko :
+-------------------------------
+
+
+
+🔔 PESANAN BARU MASUK!
+Mohon segera siapkan pesanan berikut.
+
+🧾 No. Transaksi: [Nomor Transaksi]
+🕒 Waktu Pesanan: [Tanggal & Jam]
+👤 Nama Pembeli: [Nama Pembeli]
+📱 No. HP: [Nomor HP]
+
+DETAIL PESANAN:
+[Nama Produk] × [Jumlah]
+[Nama Produk] × [Jumlah]
+[Nama Produk] × [Jumlah]
+
+📦 Total Item: [Jumlah Item] pcs
+💰 Total Pembayaran: Rp[Total]
+💳 Status Pembayaran: Berhasil
+🚚 Metode Pengiriman: Instant
+
+📌 Tindakan Kasir:
+Periksa ketersediaan produk.
+Siapkan pesanan sesuai daftar.
+Pastikan pesanan lengkap sebelum diserahkan kepada driver.
+Mohon pantau notifikasi status driver untuk proses penjemputan.
+
+Pesan otomatis dari sistem Freshly Baked by Origin Bakery. 
+
+
+## Notifikasi WhatsApps Driver Tidak tersedia ke Pembeli:
+ -------------------------------------------
+Hai, Kak! 👋
+Pesanan Kakak sedang menunggu ketersediaan driver untuk pengiriman.
+Kami akan menginformasikan pembaruan status pesanan melalui WhatsApp ini.
+
+Pesan otomatis, mohon tidak membalas. WhatsApp ini tidak menerima balasan pesan.
+Butuh bantuan? Hubungi [Nomor Toko].
+
+
+## Notifikasi WhatsApps Driver Menuju Toko ke pembeli
+------------------------------------------
+Hai, Kak! 👋
+Driver sedang menuju toko untuk mengambil pesanan Kakak. 
+
+🧾 No. Transaksi: [Nomor Transaksi]
+🚚 Pengiriman: Instant
+👤 Driver: [Nama Driver]
+
+
+Mohon tunggu, ya! Kami akan menginformasikan pembaruan status selanjutnya.
+
+Pesan otomatis, mohon tidak membalas. WhatsApp ini tidak menerima balasan pesan.
+Butuh bantuan? Hubungi [Nomor Toko].
+
+
+## Notifikasi WhatsApps Driver Mengantar Pesanan ke pembeli
+-----------------------------------------------------------
+
+Hai, Kak! 
+Pesanan Kakak sedang dalam perjalanan menuju alamat tujuan. 🛵
+
+🧾 No. Transaksi: [Nomor Transaksi]
+👤 Driver: [Nama Driver] [No Driver]
+
+
+Mohon bersiap menerima pesanan, ya. Terima kasih sudah memilih Freshly Baked by Origin Bakery! 
+
+Pesan otomatis, mohon tidak membalas. WhatsApp ini tidak menerima balasan pesan.
+Butuh bantuan? Hubungi [Nomor Toko].
+
+
+## Notifikasi WhatsApps Pesanan Berhasil Diterima ke pembeli
+------------------------------------------------------------
+
+Hai, Kak! 🥖
+Pesanan Freshly Baked by Origin Bakery sudah selesai dikirim.
+Terima kasih sudah berbelanja bersama kami. Semoga rotinya bikin hari Kakak makin menyenangkan! ❤️
+
+Pesan otomatis, mohon tidak membalas. WhatsApp ini tidak menerima balasan pesan.
+Ada kendala? Hubungi [Nomor Toko].
+
+## Notifikasi WhatsApps "Driver Menuju Toko" Ke Toko
+----------------------------------------------------
+🛵 UPDATE DRIVER
+Driver sedang menuju toko untuk mengambil pesanan.
+
+🧾 No. Transaksi: [Nomor Transaksi]
+👤 Nama Pembeli: [Nama Pembeli]
+📦 Pesanan: [Ringkasan Pesanan]
+🚴 Nama Driver: [Nama Driver]
+📱 No. HP Driver: [Nomor HP Driver]
+
+Mohon pastikan pesanan sudah siap dan lengkap sebelum diserahkan kepada driver.
+
+## Notifikasi WhatsApps "Driver Belum Tersedia" Ke Toko
+---------------------------------------------------
+DRIVER BELUM TERSEDIA
+
+🧾 No. Transaksi: [Nomor Transaksi]
+👤 Nama Pembeli: [Nama Pembeli]
+📦 Pesanan: [Ringkasan Pesanan]
+
+Saat ini driver belum tersedia. Mohon siapkan pesanan terlebih dahulu dan pantau pembaruan status pengiriman.
+
+Jika terdapat kendala stok atau persiapan, segera koordinasikan dengan tim terkait.
+
+## Notifikasi WhatsApps "Pesanan Dikembalikan ke Toko" Ke Toko
+--------------------------------------------------------------
+Driver gagal menemukan alamat tujuan, sehingga pesanan dikembalikan ke kasir.
+
+🧾 No. Transaksi: [Nomor Transaksi]
+👤 Nama Pembeli: [Nama Pembeli]
+📱 No. HP Pembeli: [Nomor HP]
+📦 Pesanan: [Ringkasan Pesanan]
+🚴 Nama Driver: [Nama Driver]
+📌 Alasan: [Alasan dari driver]
+
+Mohon segera:
+Terima kembali pesanan dari driver dan berikan kode OTP ke driver
+Periksa kondisi dan kelengkapan produk.
+Koordinasikan tindak lanjut dengan tim terkait untuk konfirmasi kepada pembeli.
+
+Pesan otomatis dari sistem Freshly Baked by Origin Bakery
 
 
 **  buat issue secara detail termasuk kira-kira apa saja file yang harus di modifikasi atau di create
