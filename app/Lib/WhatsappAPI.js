@@ -12,6 +12,7 @@ module.exports = {
         const response = await axios({
             method: 'post',
             url: API_URL,
+            timeout: Number(Env.get('WHATSAPP_REQUEST_TIMEOUT_MS', 15000)),
             data: {
                 api_key: Env.get('WHATSAPP_API_KEY'),
                 to: data.phone,

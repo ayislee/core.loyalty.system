@@ -17,23 +17,27 @@ Buatkan issue-v2-balance.md pada core.loyalty.system yang berisi perencanaan unt
 saat ini, belum ada procedure apabila terjadi kegagalan transaksi saat konsumen telah berhasil melakukan pembayaran. Misalnya kegagalan kirim mengirimkan barang atau konsumen mengkomplain barang yang diterima nya atau kondisi lain nya
 
 ** Tujuan:
-1. Ada Fitur Balance yang dimiliki konsumen,
-2. Apabila terjadi kegagalan pengiriman kurir, maka pengembalian pembelian di kembalikan melalui Balance konsumen
+1. Ada Fitur Balance/Saldo yang dimiliki konsumen,
+2. Apabila terjadi kegagalan pengiriman kurir, maka pengembalian pembelian di kembalikan melalui Balance/Saldo konsumen
 3. Pengembalian dikurangi Biaya kurir
 4. voucher dikembalikan apabila terjadi kegagalan transaksi
-5. balance bisa di withdraw
+5. balance/Saldo bisa di withdraw
 6. balance hanya bisa di gunakan sebagai alat pembayaran di marketplace
-7. Pembayaran di marketplace bisa di slit antara QRIS dengan balance apabila nilai balance tidak mencukupi untuk pembayaran di transaksi baru
+7. Pembayaran di marketplace bisa di slit antara QRIS dengan balance/saldo apabila nilai balance tidak mencukupi untuk pembayaran di transaksi baru
 8. Informasi balance ada di database core.loyalty.system
-9. Saat konsumen melakukan withdraw, dikiri 
+9. Saat konsumen melakukan withdraw, dikirim email kepada user dengan type finance 
 
 
 ** Planning nya adalah:
-1. Saat komsumen melakukan checkout di halaman product, halaman /order, konsumen melakukan pengaturan metoda pembayaran, alamat pengiriman, catatan untk kurir dan lain-lain.
-tombol "Tinjau Pesanan" Ganti menjadi "Bayar"
-2. Tambahkan ceklist Syarat dan ketentuan yang menandakan konsumen setuju, kalau di cek, berarti tombol "Bayar" Aktiv (Bisa di klik)
-3. Saat mengklik tombol bayar, langsung melakukan verifikasi ke core.loyalty.system di page itu juga dengan mengmanggil member/transaction, dengan preview_fee=true,
-apabila respon dari core.loyalty.system sama dengan dari halaman /order, maka langsung hit ulang member/transaction, dengan preview_fee=false, untuk mengcreate transaksi dan mendapatkan QRCODE, dan langsung QRCODE nya di tampilkan mirip popup yang ada di halaman /order/preorder supaya konsumen melakukan pembayaran
+a. core.loyalty.system:
+1. Buatkan tabel member_balance yang tujuan nya untuk mencatat keluar masuk balance member
+2. Buatkan API-API yang berhubungan dengan Balance Member, baik pengisian balance, pengurangan, balance, withdraw dan api lain yang diperlukan
+3. Buatkan tabel request_withdraw
+4. Saat Member mengajukan request withdraw Saldo
+
+b. client.loyalty.system:
+1. tampilkan balace/Saldo di halaman /profile, dibawah "Total Point Anda"
+2. Pada Bagian "Akses Cepat", tambahkan tombol Riwayat Saldo 
 
 
 

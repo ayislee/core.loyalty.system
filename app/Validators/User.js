@@ -7,7 +7,8 @@ class User {
 			firstname: "required|string",
             lastname: "required|string",
             phone: "required|msisdn|string",
-			password: "required"
+			password: "required",
+            type: 'in:partner,admin,finance'
 		}
 	}
 

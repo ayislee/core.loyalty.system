@@ -664,7 +664,7 @@ class TransactionController {
                 ms_payment_id: req.ms_payment_id || Env.get('MARKETPLACE_CORE_PAYMENT_ID') || Env.get('MS_PAYMENT_ID') || 4,
                 ms_delivery_id: req.ms_delivery_id,
                 preview_fee: req.preview_fee,
-                customer_name:`${auth.user.firstname?auth.user.firstname:'John'} ${auth.user.lastname?' '+auth.user.lastname:'Doe'}`,
+                customer_name: `${auth.user.firstname || 'John'}${auth.user.lastname ? ` ${auth.user.lastname}` : ''}`,
                 customer_msisdn: auth.user.phone,
                 customer_email: auth.user.email,
                 cashier_id: cashier_id,

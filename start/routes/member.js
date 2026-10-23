@@ -43,6 +43,14 @@ Route.group(()=>{
 
     Route.post('/checkout/quote', 'CheckoutController.quote').validator('CheckoutQuote')
     Route.post('/checkout/commit', 'CheckoutController.commit').validator('CheckoutCommit')
+
+    Route.get('/wallet', 'WalletController.summary')
+    Route.get('/wallet/transactions', 'WalletController.transactions')
+    Route.post('/withdrawals', 'WithdrawalController.create')
+    Route.post('/withdrawals/confirm', 'WithdrawalController.confirm')
+    Route.get('/withdrawals', 'WithdrawalController.list')
+    Route.get('/withdrawals/:id', 'WithdrawalController.detail')
+    Route.post('/withdrawals/:id/cancel', 'WithdrawalController.cancel')
     
     Route.get('/transaction','TransactionController.list').validator('Pages')
     Route.get('/transaction/get','TransactionController.get')

@@ -15,6 +15,10 @@ require('./redeem_merchant')
 require('./member')
 require('./report')
 require('./promo_banner')
+require('./refund')
+require('./withdrawal')
+require('./wallet_internal')
+require('./marketplace_wallet_refund')
 
 if(Env.get('NODE_ENV')==='development'){
     require('./test')

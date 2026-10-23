@@ -54,6 +54,7 @@ const namedMiddleware = {
   AuthMerchant :'App/Middleware/AuthMerchant',
   ConvertPhone: 'App/Middleware/ConvertPhone',
   PhoneOrEmail: 'App/Middleware/PhoneOrEmail',
+  FinanceOnly: 'App/Middleware/FinanceOnly',
 }
 
 /*

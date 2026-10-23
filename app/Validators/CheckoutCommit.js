@@ -2,7 +2,7 @@
 
 class CheckoutCommit {
     get rules () {
-        return { quote_token: 'required|string' }
+        return { quote_token: 'required|string', use_balance: 'boolean', balance_amount: 'integer|min:0' }
     }
 
     get messages () {

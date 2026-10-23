@@ -7,7 +7,8 @@ class UserEdit {
 			firstname: "required|string",
             lastname: "required|string",
             phone: "required|msisdn|string",
-			status: "in:active,not active"
+			status: "in:active,not active",
+            type: 'in:partner,admin,finance'
 		}
 	}
 

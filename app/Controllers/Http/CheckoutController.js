@@ -8,9 +8,20 @@ const axios = use('axios')
 const crypto = require('crypto')
 const MarketplaceFulfillmentService = use('App/Services/MarketplaceFulfillmentService')
 const CompanyPaymentGatewayService = use('App/Services/CompanyPaymentGatewayService')
+const WalletService = use('App/Services/WalletService')
+const CheckoutBalanceConfirmationService = use('App/Services/CheckoutBalanceConfirmationService')
 
 class CheckoutController {
     error (response, error) {
+        console.error('[CHECKOUT_ERROR]', {
+            code: error?.code || null,
+            message: error?.message || 'Unknown checkout error',
+            status: error?.status || null,
+            sql_code: error?.sqlState || error?.errno || null
+        })
+        if (`${error?.message || ''}`.includes('checkout_balance_confirmations')) {
+            return response.status(503).json({ status: false, code: 'BALANCE_CONFIRMATION_STORAGE_ERROR', message: 'Penyimpanan konfirmasi pembayaran saldo belum siap. Periksa log Core [CHECKOUT_ERROR].', data: null })
+        }
         const isKnown = error instanceof MarketplaceFulfillmentService.Error ||
             Boolean(error && error.code && error.status)
         return response.status(isKnown ? error.status : 502).json({
@@ -126,8 +137,22 @@ class CheckoutController {
             transaction_delivery_note: request.transaction_delivery_note || null,
             client_request_id: request.client_request_id || null,
             checkout_id: request.client_request_id || null,
+            wallet_hold_id: request.wallet_hold_id || null,
+            loyalty_balance_amount: Number(request.loyalty_balance_amount || 0),
+            gateway_charge_amount: request.gateway_charge_amount === undefined ? null : Number(request.gateway_charge_amount),
             transaction_url_referer: Env.get('APP_URL')
         }
+    }
+
+    balanceEnabled () { return `${Env.get('BALANCE_PAYMENT_ENABLED', 'false')}`.toLowerCase() === 'true' }
+
+    async paymentAllocation (memberId, total, request = {}) {
+        const wallet = await WalletService.getSummary(memberId)
+        const requested = request.use_balance ? Math.max(0, Number(request.balance_amount || wallet.available_balance)) : 0
+        if (!Number.isSafeInteger(requested)) throw new MarketplaceFulfillmentService.Error('BALANCE_ALLOCATION_INVALID', 'Nominal saldo tidak valid.')
+        if (requested > wallet.available_balance) throw new MarketplaceFulfillmentService.Error('BALANCE_ALLOCATION_CHANGED', 'Saldo tersedia berubah. Silakan tinjau ulang checkout.', 409)
+        const applied = Math.min(requested, wallet.available_balance, Number(total || 0))
+        return { balance: { available_balance: wallet.available_balance, requested_amount: requested, applied_amount: applied }, payment_allocation: { transaction_total: Number(total || 0), balance_amount: applied, qris_amount: Number(total || 0) - applied, remainder_payment_method: Number(total || 0) - applied > 0 ? 'QRIS' : null } }
     }
 
     sanitize (value) {
@@ -185,6 +210,20 @@ class CheckoutController {
         }).filter(Boolean)
     }
 
+    isInstantShipping (option = {}) {
+        return [option.service, option.shipment_method, option.shipment_method_description]
+            .some(value => `${value || ''}`.trim().toUpperCase() === 'INSTANT')
+    }
+
+    instantShippingOption (options = [], requestedService = null) {
+        const instant = options.filter(option => this.isInstantShipping(option))
+        if (!instant.length) throw new MarketplaceFulfillmentService.Error('SHIPPING_UNAVAILABLE', 'Pengiriman Instant tidak tersedia untuk alamat ini.', 422)
+        if (requestedService && !instant.some(option => `${option.service}` === `${requestedService}`)) {
+            throw new MarketplaceFulfillmentService.Error('SHIPPING_UNAVAILABLE', 'Layanan pengiriman yang dipilih tidak tersedia.', 422)
+        }
+        return instant.find(option => `${option.service}` === `${requestedService}`) || instant[0]
+    }
+
     async quote ({ request, response, auth }) {
         try {
             const req = request.all()
@@ -200,13 +239,17 @@ class CheckoutController {
             const selectedStore = await context.service.validateSelectedStore({ carts: context.carts, storeSlug: context.cartStore.store_slug, companySlug, paymentType: paymentGateway.ms_payment_id, addressCoordinate: context.coordinate })
             selectedStore.companySlug = companySlug
             const shippingOptions = this.shippingOptions(selectedStore.gosendPayload)
-            if (!shippingOptions.length) throw new MarketplaceFulfillmentService.Error('SHIPPING_UNAVAILABLE', 'Jasa pengiriman tidak tersedia untuk alamat ini.')
-            const selectedShipping = shippingOptions.find((option) => option.service === req.shipping_service) || shippingOptions[0]
+            const selectedShipping = this.instantShippingOption(shippingOptions, req.shipping_service)
             const cashierId = await this.cashierId(companySlug)
             if (!cashierId) throw new MarketplaceFulfillmentService.Error('MARKETPLACE_UPSTREAM_ERROR', 'Data kasir marketplace tidak tersedia.', 502)
             const payload = this.buildOrderPayload({ member: auth.user, carts: context.carts, address: context.address, selection: selectedStore, request: { ...req, ms_payment_id: paymentGateway.ms_payment_id, shipping_service: selectedShipping.service, preview_fee: true }, cashierId })
             const previewResult = await this.postRetailOrder(payload)
             if (!previewResult?.data?.success) throw new MarketplaceFulfillmentService.Error('MARKETPLACE_UPSTREAM_ERROR', previewResult?.data?.error || 'Gagal membuat preview checkout.', 502)
+            const previewData = previewResult.data.data || previewResult.data
+            const total = Number(previewData.transaction_total_amount || 0)
+            const allocation = this.balanceEnabled()
+                ? await this.paymentAllocation(auth.user.member_id, total, req)
+                : { balance: { available_balance: (await WalletService.getSummary(auth.user.member_id)).available_balance, requested_amount: 0, applied_amount: 0 }, payment_allocation: { transaction_total: total, balance_amount: 0, qris_amount: total, remainder_payment_method: 'QRIS' } }
             const expiresAt = Date.now() + context.service.quoteTtlSeconds * 1000
             const token = context.service.sign({
                 member_id: auth.user.member_id, selected_cart_ids: context.carts.map((cart) => cart.cart_id),
@@ -216,6 +259,8 @@ class CheckoutController {
                 ms_payment_id: paymentGateway.ms_payment_id, payment_gateway_identifier: paymentGateway.identifier, ms_delivery_id: req.ms_delivery_id || null,
                 shipping_service: selectedShipping.service, voucher_code: req.voucher_code || null,
                 voucher_type: req.voucher_code ? (String(req.voucher_code).startsWith('global:') ? 'loyalty_global' : 'loyalty') : null,
+                balance_amount: allocation.payment_allocation.balance_amount,
+                transaction_total: total,
                 client_request_id: req.client_request_id || null, expires_at: expiresAt
             })
             const responseData = this.quoteResponseData({ token, address: context.address, preview: previewResult.data.data || previewResult.data, paymentGateway })
@@ -228,6 +273,8 @@ class CheckoutController {
             }
             responseData.shipping_options = shippingOptions
             responseData.selected = { ...responseData.selected, shipping_service: selectedShipping.service }
+            responseData.balance = allocation.balance
+            responseData.payment_allocation = allocation.payment_allocation
             return response.json({ status: true, message: 'Checkout quote berhasil dibuat', data: responseData })
         } catch (error) { return this.error(response, error) }
     }
@@ -240,6 +287,11 @@ class CheckoutController {
             if (`${quote.member_id}` !== `${auth.user.member_id}`) throw new MarketplaceFulfillmentService.Error('INVALID_QUOTE_TOKEN', 'Data checkout tidak valid. Silakan ulangi checkout dari keranjang.')
             if (quote.client_request_id && req.client_request_id && quote.client_request_id !== req.client_request_id) throw new MarketplaceFulfillmentService.Error('INVALID_QUOTE_TOKEN', 'Data checkout tidak valid. Silakan ulangi checkout dari keranjang.')
             const context = await this.checkoutContext(auth.user.member_id, quote.selected_cart_ids, quote.address_id)
+            const quotedItems = (quote.items || []).map(item => `${item.cart_id}:${item.menu_id || ''}:${item.item_id || ''}:${Number(item.quantity)}:${item.note || ''}`).sort()
+            const currentItems = context.carts.map(item => `${item.cart_id}:${item.menu_id || ''}:${item.item_id || ''}:${Number(item.quantity)}:${item.note || ''}`).sort()
+            if (quotedItems.length !== currentItems.length || quotedItems.some((item, index) => item !== currentItems[index])) {
+                throw new MarketplaceFulfillmentService.Error('FULFILLMENT_CHANGED', 'Keranjang berubah. Silakan tinjau ulang checkout.', 409)
+            }
             if (context.coordinate !== quote.address_coordinate) throw new MarketplaceFulfillmentService.Error('FULFILLMENT_CHANGED', 'Alamat pengiriman berubah. Silakan tinjau ulang pesanan.', 409)
             const paymentGateway = await CompanyPaymentGatewayService.resolveForMember({ member: auth.user, partnerId: quote.partner_id || null })
             if (paymentGateway.company_slug !== quote.company_slug || paymentGateway.identifier !== quote.payment_gateway_identifier || `${paymentGateway.ms_payment_id}` !== `${quote.ms_payment_id}`) {
@@ -250,13 +302,41 @@ class CheckoutController {
             }
             const selectedStore = await context.service.validateSelectedStore({ carts: context.carts, storeSlug: quote.store_slug, addressCoordinate: context.coordinate, companySlug: quote.company_slug, paymentType: quote.ms_payment_id })
             if (`${selectedStore.storeId}` !== `${quote.store_id}` || selectedStore.storeSlug !== quote.store_slug) throw new MarketplaceFulfillmentService.Error('FULFILLMENT_CHANGED', 'Stok atau ketersediaan toko berubah. Silakan tinjau ulang pesanan.', 409)
+            const selectedShipping = this.instantShippingOption(this.shippingOptions(selectedStore.gosendPayload), quote.shipping_service)
+            if (`${selectedShipping.service}` !== `${quote.shipping_service}`) throw new MarketplaceFulfillmentService.Error('FULFILLMENT_CHANGED', 'Layanan pengiriman berubah. Silakan tinjau ulang checkout.', 409)
             selectedStore.companySlug = quote.company_slug
             const cashierId = await this.cashierId(quote.company_slug)
             if (!cashierId) throw new MarketplaceFulfillmentService.Error('MARKETPLACE_UPSTREAM_ERROR', 'Data kasir marketplace tidak tersedia.', 502)
-            const finalRequest = { ...quote, ...req, ms_payment_id: paymentGateway.ms_payment_id, preview_fee: false, client_request_id: quote.client_request_id || req.client_request_id }
+            const total = Number(quote.transaction_total || 0)
+            const requestedAmount = Number(req.balance_amount || quote.balance_amount || 0)
+            if (this.balanceEnabled() && requestedAmount !== Number(quote.balance_amount || 0)) throw new MarketplaceFulfillmentService.Error('BALANCE_ALLOCATION_CHANGED', 'Pilihan saldo berubah. Silakan buat quote baru.', 409)
+            const allocation = this.balanceEnabled()
+                ? await this.paymentAllocation(auth.user.member_id, total, { use_balance: Number(quote.balance_amount || 0) > 0, balance_amount: Number(quote.balance_amount || 0) })
+                : { payment_allocation: { balance_amount: 0, qris_amount: total } }
+            if (allocation.payment_allocation.balance_amount !== Number(quote.balance_amount || 0)) throw new MarketplaceFulfillmentService.Error('BALANCE_ALLOCATION_CHANGED', 'Saldo tersedia berubah. Silakan tinjau ulang checkout.', 409)
+            if (allocation.payment_allocation.balance_amount > 0) {
+                if (!req.balance_confirmation_id || !req.balance_confirmation_token) {
+                    const confirmation = await CheckoutBalanceConfirmationService.request({ member: auth.user, quoteToken: req.quote_token, clientRequestId: quote.client_request_id || req.client_request_id, amount: allocation.payment_allocation.balance_amount })
+                    return response.status(202).json({ status: true, message: 'Token konfirmasi pembayaran saldo telah dikirim.', data: { requires_balance_confirmation: true, ...confirmation, payment_allocation: allocation.payment_allocation } })
+                }
+                await CheckoutBalanceConfirmationService.verify({ memberId: auth.user.member_id, id: req.balance_confirmation_id, token: req.balance_confirmation_token, quoteToken: req.quote_token, clientRequestId: quote.client_request_id || req.client_request_id })
+            }
+            let balanceHold = null
+            if (allocation.payment_allocation.balance_amount > 0) {
+                const ttl = Math.max(60, Number(Env.get('WALLET_HOLD_TTL_SECONDS', context.service.quoteTtlSeconds || 900)))
+                balanceHold = await WalletService.createHold({ member_id: auth.user.member_id, amount: allocation.payment_allocation.balance_amount, purpose: 'checkout', reference_id: quote.client_request_id || req.client_request_id, idempotency_key: `checkout-hold:${quote.client_request_id || req.client_request_id}`, expires_at: new Date(Date.now() + ttl * 1000) })
+            }
+            const finalRequest = { ...quote, ...req, ms_payment_id: paymentGateway.ms_payment_id, preview_fee: false, client_request_id: quote.client_request_id || req.client_request_id, wallet_hold_id: balanceHold?.hold?.wallet_hold_id || null, loyalty_balance_amount: allocation.payment_allocation.balance_amount, gateway_charge_amount: allocation.payment_allocation.qris_amount }
             const payload = this.buildOrderPayload({ member: auth.user, carts: context.carts, address: context.address, selection: selectedStore, request: finalRequest, cashierId })
-            const result = await this.postRetailOrder(payload)
-            if (!result?.data?.success) throw new MarketplaceFulfillmentService.Error('MARKETPLACE_ORDER_FAILED', result?.data?.error || 'Gagal membuat pesanan. Silakan coba lagi.', 502, { upstream_message: result?.data?.error || null })
+            let result
+            try { result = await this.postRetailOrder(payload) } catch (error) {
+                if (balanceHold && error.status && error.status < 500) await WalletService.releaseHold({ hold_id: balanceHold.hold.wallet_hold_id, idempotency_key: `checkout-release:${quote.client_request_id || req.client_request_id}`, reason: 'Marketplace order gagal' })
+                throw error
+            }
+            if (!result?.data?.success) {
+                if (balanceHold) await WalletService.releaseHold({ hold_id: balanceHold.hold.wallet_hold_id, idempotency_key: `checkout-release:${quote.client_request_id || req.client_request_id}`, reason: 'Marketplace order gagal dibuat' })
+                throw new MarketplaceFulfillmentService.Error('MARKETPLACE_ORDER_FAILED', result?.data?.error || 'Gagal membuat pesanan. Silakan coba lagi.', 502, { upstream_message: result?.data?.error || null })
+            }
             const transaction = new Transaction()
             transaction.member_id = auth.user.member_id
             transaction.request = JSON.stringify(payload)
@@ -271,7 +351,9 @@ class CheckoutController {
                 message: 'Checkout berhasil diproses',
                 data: {
                     transaction: this.sanitize(result.data.data),
-                    payment_gateway: result.data.payment_gateway || null
+                    payment_gateway: result.data.payment_gateway || null,
+                    payment_allocation: allocation.payment_allocation,
+                    balance_hold_id: balanceHold ? balanceHold.hold.wallet_hold_id : null
                 },
                 token: result.data.token || null
             })

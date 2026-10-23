@@ -121,6 +121,7 @@ class UserController {
             user.lastname = request.all().lastname
             user.phone = request.all().phone
             user.password = request.all().password
+            user.type = request.all().type || 'partner'
             
             await user.save()
             return response.json({
@@ -191,6 +192,7 @@ class UserController {
         if(auth.user.type === 'admin' || auth.user.is_owner === 'yes') {
             user.status = request.all().status ? request.all().status : user.status
         }
+        if (auth.user.type === 'admin' && request.all().type) user.type = request.all().type
         
         await user.save()
         return response.json({

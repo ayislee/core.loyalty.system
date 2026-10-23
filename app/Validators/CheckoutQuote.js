@@ -4,7 +4,9 @@ class CheckoutQuote {
     get rules () {
         return {
             selected_cart_ids: 'required|array',
-            address_id: 'required|integer'
+            address_id: 'required|integer',
+            use_balance: 'boolean',
+            balance_amount: 'integer|min:0'
         }
     }
 
