@@ -1,4 +1,4 @@
-Buatkan issue-v2-order.md pada core.loyalty.system yang berisi perencanaan untuk nanti di implementasikan oleh jonior programmer atau ai model yang lebih murah
+Buatkan issue-notification-schedule.md pada core.loyalty.system yang berisi perencanaan untuk nanti di implementasikan oleh jonior programmer atau ai model yang lebih murah
 
 ** struktur folder:
 1. core.loyalty.system = backend loyalty / proxy
@@ -8,167 +8,37 @@ Buatkan issue-v2-order.md pada core.loyalty.system yang berisi perencanaan untuk
 5. frontend-mediacartz-react = frontend marketplace untuk backend-mediacartz
 
 ** Scoop Perubahan:
-1. client.loyalty.system = frontend loyalty customer (apabila diperlukan)
-2. core.loyalty.system = backend loyalty / proxy
-3. backend-mediacartz = backend marketplace / MARKETPLACE_CORE
+1. core.loyalty.system = backend loyalty / proxy
+2. client.loyalty.system = frontend loyalty customer
+3. cms.loyalty.system = frontend management loyalty
+4. backend-mediacartz = backend marketplace / MARKETPLACE_CORE
+5. frontend-mediacartz-react = frontend marketplace untuk backend-mediacartz
 
 ** Latar belakang:
+Saat ini konsumen tidak dibatasi waktu dalam melakukan transaksi, masalahnya bisa saja konsumen melakukan transaksi disaat toko sudah tutup sehingga tidak ada pegawai yang merespon transaksi, untuk itu dibutuhkan perjanjian jadwal pengiriman apabila saat checkout, operasional sedang tutup yang akan di jadwalkan di hari berikutnya. 
 
 ** Tujuan:
-halaman /order quantity product bisa di ubah
+1. konsumen bisa menjadwalkan pengiriman di hari berikutnya apabila transaksi dilakukan diluar batas jam operasional  
+2. membuat scheduler notifikasi ke toko bahwa ada transaksi yang harus di tangani sesuai jadwal yang disusun konsumen
+3. Pada tabel mediacartzdb, tabel store.store_operation_time adalah jadwal operational toko
+4. contoh store.store_operation_time ["09:00-17:00", "09:00-17:00", "09:00-17:00", "09:00-17:00", "09:00-17:00", "", ""]
+5. array [0] merupakan hari senin, dan terakhir adalah minggu
+6. marketplace buka 24 jam x 7
+7. apabila ada transaksi diluar jam operasi minus buffer maka ketentuan nya sebegai berikut:
+-- apabila transaksi sebelum jam operasional maka penjadwalan dilakukan hari itu juga pada masa jam operasional
+-- apabila transaksi setelah jam operasional, maka penjadwalan dilakukan hari berikutnya pada masa jam operasional
+-- apabila transaksi dilakukan di hari toko tutup maka penjadwalan dilakukan saat toko buka di hari berikutnya pada masa jam operasional
+-- penjadwalan hanya sebatas notifikasi whatapps kepada toko agar petugas memproses transaksi 
+8. batas terakhir pengiriman operasional normal diatur di .env backend-mediacartz misalnya 1 jam sebelum toko tutup dengan nilai default 1 jam sebelum toko tutup
 
 ** Planning nya adalah:
-1. Pada halaman /order, tambahkan [-] [Quantity] [+]
-2. saat quantity bearubah, secara otomatis hitung ulang semua nilai
-3. pilihan "Onkos kirim" Hanya menampilkan Instant
-4. Saat Popup QRIS, text tombol "Tutup" Berarna Putih
-5. Durasi pembayaran ubah ke 1 jam (60 menit) 
-6. pada popup pembayaran QRIS tambahkan Informasi:
-"Mengalami kendala pembayaran atau status masih pending setelah membayar? [Hubungi kami di sini]"
-[Hubungi kami disini] di link membuka whatapps ke nomor toko
-7. Template Notifikasi WhatsApp:
-
-## Pembayaran Berhasil  ke Pembeli:
--------------------------------
-Hai, Kak! 
-Pembayaran pesanan Kakak berhasil diterima.
-
-🧾 No. Transaksi: #[transaksion_id]
-💰 Total Pembayaran: [Total Pembayaran]
-🚚 Pengiriman: [Instant]
-
-Pesanan Kakak sedang diproses. Terima kasih sudah berbelanja di [Nama Company/Perusahaan]! 
-
-Pesan otomatis: Mohon tidak membalas pesan ini karena WhatsApp ini hanya digunakan untuk mengirim notifikasi.
-Jika membutuhkan bantuan, silakan hubungi [Nomor Toko].
+1. buatkan tabel di mediacartzdb untuk keperluan penjadwalan notifikasi WhatsApp ke nomor toko
+2. saat service mediacartz dijalankan secara otomatis menjalankan scheduler
+3. pengecekan jadwal dilakukan setiap 5 menit sekali, apabila dari tabel terdeteksi memasuki kriteria maka notofikasi whatapps dikirim ke toko agar mengecek daftar transaksi dan memproses transaksi
+4. Pada client.loyalty.system, apabila ada transaksi di luar jadwal operasional, maka sebelum popup pembayaran, keluar popup penjadwalan kapan produk harus di kirim sesuai kekentuan. setelah memasukan jadwal baru QRIS atau metoda pembayaran lain di tampilkan
+5. isi Notifikasi yang terjadwal sama seperti notifikasi konsumen berhasil melakukan pembayaran  
 
 
-## Pembayaran Berhasil  ke Toko :
--------------------------------
-
-
-
-🔔 PESANAN BARU MASUK!
-Mohon segera siapkan pesanan berikut.
-
-🧾 No. Transaksi: [Nomor Transaksi]
-🕒 Waktu Pesanan: [Tanggal & Jam]
-👤 Nama Pembeli: [Nama Pembeli]
-📱 No. HP: [Nomor HP]
-
-DETAIL PESANAN:
-[Nama Produk] × [Jumlah]
-[Nama Produk] × [Jumlah]
-[Nama Produk] × [Jumlah]
-
-📦 Total Item: [Jumlah Item] pcs
-💰 Total Pembayaran: Rp[Total]
-💳 Status Pembayaran: Berhasil
-🚚 Metode Pengiriman: Instant
-
-📌 Tindakan Kasir:
-Periksa ketersediaan produk.
-Siapkan pesanan sesuai daftar.
-Pastikan pesanan lengkap sebelum diserahkan kepada driver.
-Mohon pantau notifikasi status driver untuk proses penjemputan.
-
-Pesan otomatis dari sistem Freshly Baked by Origin Bakery. 
-
-
-## Notifikasi WhatsApps Driver Tidak tersedia ke Pembeli:
- -------------------------------------------
-Hai, Kak! 👋
-Pesanan Kakak sedang menunggu ketersediaan driver untuk pengiriman.
-Kami akan menginformasikan pembaruan status pesanan melalui WhatsApp ini.
-
-Pesan otomatis, mohon tidak membalas. WhatsApp ini tidak menerima balasan pesan.
-Butuh bantuan? Hubungi [Nomor Toko].
-
-
-## Notifikasi WhatsApps Driver Menuju Toko ke pembeli
-------------------------------------------
-Hai, Kak! 👋
-Driver sedang menuju toko untuk mengambil pesanan Kakak. 
-
-🧾 No. Transaksi: [Nomor Transaksi]
-🚚 Pengiriman: Instant
-👤 Driver: [Nama Driver]
-
-
-Mohon tunggu, ya! Kami akan menginformasikan pembaruan status selanjutnya.
-
-Pesan otomatis, mohon tidak membalas. WhatsApp ini tidak menerima balasan pesan.
-Butuh bantuan? Hubungi [Nomor Toko].
-
-
-## Notifikasi WhatsApps Driver Mengantar Pesanan ke pembeli
------------------------------------------------------------
-
-Hai, Kak! 
-Pesanan Kakak sedang dalam perjalanan menuju alamat tujuan. 🛵
-
-🧾 No. Transaksi: [Nomor Transaksi]
-👤 Driver: [Nama Driver] [No Driver]
-
-
-Mohon bersiap menerima pesanan, ya. Terima kasih sudah memilih Freshly Baked by Origin Bakery! 
-
-Pesan otomatis, mohon tidak membalas. WhatsApp ini tidak menerima balasan pesan.
-Butuh bantuan? Hubungi [Nomor Toko].
-
-
-## Notifikasi WhatsApps Pesanan Berhasil Diterima ke pembeli
-------------------------------------------------------------
-
-Hai, Kak! 🥖
-Pesanan Freshly Baked by Origin Bakery sudah selesai dikirim.
-Terima kasih sudah berbelanja bersama kami. Semoga rotinya bikin hari Kakak makin menyenangkan! ❤️
-
-Pesan otomatis, mohon tidak membalas. WhatsApp ini tidak menerima balasan pesan.
-Ada kendala? Hubungi [Nomor Toko].
-
-## Notifikasi WhatsApps "Driver Menuju Toko" Ke Toko
-----------------------------------------------------
-🛵 UPDATE DRIVER
-Driver sedang menuju toko untuk mengambil pesanan.
-
-🧾 No. Transaksi: [Nomor Transaksi]
-👤 Nama Pembeli: [Nama Pembeli]
-📦 Pesanan: [Ringkasan Pesanan]
-🚴 Nama Driver: [Nama Driver]
-📱 No. HP Driver: [Nomor HP Driver]
-
-Mohon pastikan pesanan sudah siap dan lengkap sebelum diserahkan kepada driver.
-
-## Notifikasi WhatsApps "Driver Belum Tersedia" Ke Toko
----------------------------------------------------
-DRIVER BELUM TERSEDIA
-
-🧾 No. Transaksi: [Nomor Transaksi]
-👤 Nama Pembeli: [Nama Pembeli]
-📦 Pesanan: [Ringkasan Pesanan]
-
-Saat ini driver belum tersedia. Mohon siapkan pesanan terlebih dahulu dan pantau pembaruan status pengiriman.
-
-Jika terdapat kendala stok atau persiapan, segera koordinasikan dengan tim terkait.
-
-## Notifikasi WhatsApps "Pesanan Dikembalikan ke Toko" Ke Toko
---------------------------------------------------------------
-Driver gagal menemukan alamat tujuan, sehingga pesanan dikembalikan ke kasir.
-
-🧾 No. Transaksi: [Nomor Transaksi]
-👤 Nama Pembeli: [Nama Pembeli]
-📱 No. HP Pembeli: [Nomor HP]
-📦 Pesanan: [Ringkasan Pesanan]
-🚴 Nama Driver: [Nama Driver]
-📌 Alasan: [Alasan dari driver]
-
-Mohon segera:
-Terima kembali pesanan dari driver dan berikan kode OTP ke driver
-Periksa kondisi dan kelengkapan produk.
-Koordinasikan tindak lanjut dengan tim terkait untuk konfirmasi kepada pembeli.
-
-Pesan otomatis dari sistem Freshly Baked by Origin Bakery
 
 
 **  buat issue secara detail termasuk kira-kira apa saja file yang harus di modifikasi atau di create

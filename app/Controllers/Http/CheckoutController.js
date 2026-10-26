@@ -135,6 +135,7 @@ class CheckoutController {
             shipping_destination_address: address.full_address,
             shipping_destination_coordinate: address.coordinate,
             transaction_delivery_note: request.transaction_delivery_note || null,
+			delivery_scheduled_at: request.delivery_scheduled_at || null,
             client_request_id: request.client_request_id || null,
             checkout_id: request.client_request_id || null,
             wallet_hold_id: request.wallet_hold_id || null,
@@ -263,7 +264,8 @@ class CheckoutController {
                 transaction_total: total,
                 client_request_id: req.client_request_id || null, expires_at: expiresAt
             })
-            const responseData = this.quoteResponseData({ token, address: context.address, preview: previewResult.data.data || previewResult.data, paymentGateway })
+			const responseData = this.quoteResponseData({ token, address: context.address, preview: previewResult.data.data || previewResult.data, paymentGateway })
+			responseData.delivery_schedule = previewData.delivery_schedule || null
             responseData.provider_store_name = context.cartStore.store_name || selectedStore.store?.store_name || selectedStore.store_name || null
             responseData.fulfillment = {
                 store_id: selectedStore.storeId,
