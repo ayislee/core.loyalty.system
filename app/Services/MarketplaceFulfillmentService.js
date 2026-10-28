@@ -21,6 +21,8 @@ class MarketplaceFulfillmentService {
         const configuredTtl = Number(Env.get('MARKETPLACE_CHECKOUT_QUOTE_TTL_SECONDS'))
         this.quoteTtlSeconds = Number.isFinite(configuredTtl) && configuredTtl > 0 ? configuredTtl : 900
         this.tokenSecret = Env.get('MARKETPLACE_CHECKOUT_TOKEN_SECRET') || Env.get('APP_KEY')
+        const configuredTimeout = Number(Env.get('MARKETPLACE_CORE_TIMEOUT_MS', 10000))
+        this.requestTimeout = Number.isFinite(configuredTimeout) && configuredTimeout > 0 ? configuredTimeout : 10000
     }
 
     static get Error () { return FulfillmentError }
@@ -46,10 +48,15 @@ class MarketplaceFulfillmentService {
     }
 
     async request (method, path, options = {}) {
+        const startedAt = Date.now()
         try {
-            return await axios({ method, url: `${this.marketplaceCore}${path}`, ...options })
+            const response = await axios({ method, url: `${this.marketplaceCore}${path}`, timeout: this.requestTimeout, ...options })
+            console.info('[MARKETPLACE_FULFILLMENT]', { method, path, duration_ms: Date.now() - startedAt, status: response.status })
+            return response
         } catch (error) {
-            throw new FulfillmentError('MARKETPLACE_UPSTREAM_ERROR', 'Gagal membaca data marketplace. Silakan coba lagi.', 502, null)
+            const isTimeout = error?.code === 'ECONNABORTED' || `${error?.message || ''}`.toLowerCase().includes('timeout')
+            console.error('[MARKETPLACE_FULFILLMENT]', { method, path, duration_ms: Date.now() - startedAt, code: error?.code || null, message: error?.message || null })
+            throw new FulfillmentError(isTimeout ? 'MARKETPLACE_UPSTREAM_TIMEOUT' : 'MARKETPLACE_UPSTREAM_ERROR', isTimeout ? 'Waktu memuat data checkout habis. Silakan coba lagi.' : 'Gagal membaca data marketplace. Silakan coba lagi.', isTimeout ? 504 : 502, null)
         }
     }
 
@@ -100,7 +107,8 @@ class MarketplaceFulfillmentService {
         let response
         try {
             response = await axios.get(`${this.marketplaceCore}transaction/shipping/gosend/cost`, {
-                params: { origin, destination, paymentType }
+                params: { origin, destination, paymentType },
+                timeout: this.requestTimeout
             })
         } catch (error) {
             return { upstreamFailed: true, distanceKm: null, payload: null }

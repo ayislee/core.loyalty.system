@@ -16,6 +16,11 @@ class PaymentGatewayError extends Error {
 class CompanyPaymentGatewayService {
     static get Error () { return PaymentGatewayError }
 
+    marketplaceTimeout () {
+        const configured = Number(Env.get('MARKETPLACE_CORE_TIMEOUT_MS', 10000))
+        return Number.isFinite(configured) && configured > 0 ? configured : 10000
+    }
+
     normalizeIdentifier (value) {
         return `${value || ''}`.trim().toUpperCase()
     }
@@ -101,9 +106,12 @@ class CompanyPaymentGatewayService {
     async storesForCompany (companySlug) {
         let response
         try {
-            response = await axios.get(`${Env.get('MARKETPLACE_CORE')}company/slug/${encodeURIComponent(companySlug)}/store`)
+            response = await axios.get(`${Env.get('MARKETPLACE_CORE')}company/slug/${encodeURIComponent(companySlug)}/store`, {
+                timeout: this.marketplaceTimeout()
+            })
         } catch (error) {
-            throw new PaymentGatewayError('MARKETPLACE_UPSTREAM_ERROR', 'Gagal membaca konfigurasi payment gateway marketplace.', 502)
+            const isTimeout = error?.code === 'ECONNABORTED' || `${error?.message || ''}`.toLowerCase().includes('timeout')
+            throw new PaymentGatewayError(isTimeout ? 'MARKETPLACE_UPSTREAM_TIMEOUT' : 'MARKETPLACE_UPSTREAM_ERROR', isTimeout ? 'Waktu membaca konfigurasi payment gateway habis.' : 'Gagal membaca konfigurasi payment gateway marketplace.', isTimeout ? 504 : 502)
         }
         if (response?.data?.error || response?.data?.success === false) {
             throw new PaymentGatewayError('MARKETPLACE_UPSTREAM_ERROR', response?.data?.error || 'Gagal membaca konfigurasi payment gateway marketplace.', 502)
@@ -118,10 +126,12 @@ class CompanyPaymentGatewayService {
         let response
         try {
             response = await axios.get(`${Env.get('MARKETPLACE_CORE')}list/ms_payment`, {
-                params: { ms_payment_identifier: identifier }
+                params: { ms_payment_identifier: identifier },
+                timeout: this.marketplaceTimeout()
             })
         } catch (error) {
-            throw new PaymentGatewayError('MARKETPLACE_UPSTREAM_ERROR', 'Gagal membaca master payment marketplace.', 502)
+            const isTimeout = error?.code === 'ECONNABORTED' || `${error?.message || ''}`.toLowerCase().includes('timeout')
+            throw new PaymentGatewayError(isTimeout ? 'MARKETPLACE_UPSTREAM_TIMEOUT' : 'MARKETPLACE_UPSTREAM_ERROR', isTimeout ? 'Waktu membaca master payment habis.' : 'Gagal membaca master payment marketplace.', isTimeout ? 504 : 502)
         }
         const payments = Array.isArray(response?.data?.data) ? response.data.data : []
         const payment = payments.find((entry) => this.normalizeIdentifier(entry.ms_payment_identifier) === identifier)

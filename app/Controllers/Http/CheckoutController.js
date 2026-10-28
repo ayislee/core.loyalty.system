@@ -12,6 +12,11 @@ const WalletService = use('App/Services/WalletService')
 const CheckoutBalanceConfirmationService = use('App/Services/CheckoutBalanceConfirmationService')
 
 class CheckoutController {
+    marketplaceTimeout () {
+        const configured = Number(Env.get('MARKETPLACE_CORE_PAYMENT_TIMEOUT_MS', 25000))
+        return Number.isFinite(configured) && configured > 0 ? configured : 25000
+    }
+
     error (response, error) {
         console.error('[CHECKOUT_ERROR]', {
             code: error?.code || null,
@@ -53,7 +58,9 @@ class CheckoutController {
 
     async cashierId (companySlug) {
         try {
-            const result = await axios.get(`${Env.get('MARKETPLACE_CORE')}company/slug/${encodeURIComponent(companySlug)}/cashier`)
+            const result = await axios.get(`${Env.get('MARKETPLACE_CORE')}company/slug/${encodeURIComponent(companySlug)}/cashier`, {
+                timeout: this.marketplaceTimeout()
+            })
             const cashier = result?.data?.data?.[0]
             return cashier ? cashier.cashier_id : null
         } catch (error) {
@@ -83,15 +90,21 @@ class CheckoutController {
     async postRetailOrder (payload) {
         const url = `${Env.get('MARKETPLACE_CORE')}transaction/retail/order`
         const path = new URL(url).pathname
+        const startedAt = Date.now()
         try {
-            return await axios.post(url, payload, {
-                headers: this.marketplaceRequestHeaders('POST', path, payload)
+            const result = await axios.post(url, payload, {
+                headers: this.marketplaceRequestHeaders('POST', path, payload),
+                timeout: this.marketplaceTimeout()
             })
+            console.info('[CHECKOUT_MARKETPLACE_ORDER]', { duration_ms: Date.now() - startedAt, status: result.status })
+            return result
         } catch (error) {
+            const isTimeout = error?.code === 'ECONNABORTED' || `${error?.message || ''}`.toLowerCase().includes('timeout')
             const upstream = error?.response?.data || {}
-            const code = `${upstream.code || upstream.error || 'MARKETPLACE_UPSTREAM_ERROR'}`.slice(0, 100)
-            const message = `${upstream.message || upstream.error || 'Marketplace gagal memproses payment request.'}`.slice(0, 500)
-            const status = Number(error?.response?.status) || 502
+            const code = `${isTimeout ? 'MARKETPLACE_UPSTREAM_TIMEOUT' : (upstream.code || upstream.error || 'MARKETPLACE_UPSTREAM_ERROR')}`.slice(0, 100)
+            const message = `${isTimeout ? 'Waktu memproses pembayaran habis. Periksa daftar transaksi sebelum mencoba lagi.' : (upstream.message || upstream.error || 'Marketplace gagal memproses payment request.')}`.slice(0, 500)
+            const status = isTimeout ? 504 : (Number(error?.response?.status) || 502)
+            console.error('[CHECKOUT_MARKETPLACE_ORDER]', { duration_ms: Date.now() - startedAt, status, code, message: error?.message || null })
             const diagnostic = upstream.data && typeof upstream.data === 'object' ? upstream.data : {}
             throw new MarketplaceFulfillmentService.Error(code, message, status, {
                 upstream_code: `${diagnostic.upstream_code || code}`.slice(0, 100),
