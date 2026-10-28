@@ -793,6 +793,47 @@ class TransactionController {
         }
     }
 
+    async finalizeDeliverySchedule({request, response, auth}) {
+        const req = request.all()
+        const transactionId = req.transaction_id || req.id
+        const deliveryScheduledAt = req.delivery_scheduled_at
+
+        if (!transactionId || !deliveryScheduledAt) {
+            return response.badRequest({ status: false, message: 'transaction_id dan delivery_scheduled_at wajib diisi' })
+        }
+
+        try {
+            const transaction = await ProductReviewEligibility.findMemberTransaction({
+                email: auth.user.email,
+                transactionId
+            })
+            if (!transaction) return response.status(404).json({ status: false, message: 'Transaksi tidak ditemukan' })
+            if (!isTransactionOwnedByMember(transaction, auth.user)) return response.status(403).json({ status: false, message: 'Transaksi bukan milik member' })
+
+            const api = `${Env.get('MARKETPLACE_CORE')}transaction/${encodeURIComponent(transactionId)}/delivery-schedule`
+            const secret = Env.get('MARKETPLACE_CORE_SIGNATURE_SECRET')
+            if (!secret) return response.status(502).json({ status: false, code: 'MARKETPLACE_CORE_SIGNATURE_NOT_CONFIGURED', message: 'Konfigurasi marketplace belum lengkap.' })
+            const body = { delivery_scheduled_at: deliveryScheduledAt }
+            const timestamp = `${Math.floor(Date.now() / 1000)}`
+            const path = new URL(api).pathname
+            const bodyHash = crypto.createHash('sha256').update(JSON.stringify(body)).digest('hex')
+            const signaturePayload = `PUT\n${path}\n${timestamp}\n${bodyHash}`
+            const result = await axios.put(api, body, {
+                headers: {
+                    'x-marketplace-source': 'CORE_LOYALTY',
+                    'x-marketplace-timestamp': timestamp,
+                    'x-marketplace-signature': crypto.createHmac('sha256', secret).update(signaturePayload).digest('hex')
+                }
+            })
+            const payload = result?.data || {}
+            if (!payload.success) return response.status(409).json({ status: false, message: payload.error || payload.message || 'Gagal menyimpan jadwal pengiriman', data: payload.data || null })
+            return response.json({ status: true, message: payload.success, data: payload.data })
+        } catch (error) {
+            const upstream = error?.response?.data || {}
+            return response.status(Number(error?.response?.status) || 502).json({ status: false, message: upstream.error || upstream.message || error.message, data: upstream.data || null })
+        }
+    }
+
 }
 
 module.exports = TransactionController

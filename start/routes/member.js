@@ -56,6 +56,7 @@ Route.group(()=>{
     Route.get('/transaction/get','TransactionController.get')
     Route.post('/transaction','TransactionController.create')
     Route.put('/transaction/resume','TransactionController.resume')
+	Route.put('/transaction/delivery-schedule','TransactionController.finalizeDeliverySchedule')
     Route.put('/transaction/shipping/receive','TransactionController.receiveShipping')
     Route.put('/transaction/complete','TransactionController.complete')
     Route.put('/transaction/complain','TransactionController.complain')
