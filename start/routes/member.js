@@ -87,6 +87,7 @@ Route.group(()=>{
     Route.get('/','MemberController.gets').validator('Pages')
     Route.get('/get','MemberController.get').validator('MemberID')
     Route.get('/points','MemberController.member_points').validator('MemberID').validator('Pages')
+    Route.get('/wallet/transactions','MemberController.member_wallet_transactions').validator('MemberID').validator('Pages')
     Route.get('/vouchers','MemberController.member_vouchers').validator('MemberID').validator('Pages')
 }).prefix(prefix2).middleware(['auth:jwt'])
 

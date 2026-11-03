@@ -4,6 +4,7 @@ const Lib = use("App/Lib/LoyaltyLib")
 const GetPoint = use('App/Models/GetPoint')
 const Point = use('App/Models/Point')
 const PointHistory = use('App/Models/PointHistory')
+const WalletLedgerEntry = use('App/Models/WalletLedgerEntry')
 const Voucher = use('App/Models/Voucher')
 const MemberVoucher = use('App/Models/MemberVoucher')
 const Database = use('Database')
@@ -1183,18 +1184,32 @@ class MemberController {
 
     // Admin Member
     async gets({request, response, auth}) {
-        const sortBy = request.input('sort_by') === 'total_point' ? 'total_point' : 'created_at'
+        const requestedSortBy = request.input('sort_by')
+        const sortBy = ['total_point', 'available_balance'].includes(requestedSortBy) ? requestedSortBy : 'created_at'
         const sortDirection = `${request.input('sort_direction') || 'DESC'}`.toUpperCase() === 'ASC' ? 'ASC' : 'DESC'
         const data = Member.query()
             .leftJoin('points', function () {
                 this.on('points.member_id', '=', 'members.member_id')
                     .onNull('points.deleted_at')
             })
-            .select('members.*', Database.raw('COALESCE(points.point, 0) as total_point'))
+            .leftJoin('member_wallets', function () {
+                this.on('member_wallets.member_id', '=', 'members.member_id')
+                    .andOn('member_wallets.currency', '=', Database.raw("'IDR'"))
+            })
+            .select(
+                'members.*',
+                Database.raw('COALESCE(points.point, 0) as total_point'),
+                Database.raw('COALESCE(member_wallets.ledger_balance, 0) as ledger_balance'),
+                Database.raw('COALESCE(member_wallets.held_balance, 0) as held_balance'),
+                Database.raw('COALESCE(member_wallets.ledger_balance, 0) - COALESCE(member_wallets.held_balance, 0) as available_balance')
+            )
             .filter(request.all().filter)
 
         if (sortBy === 'total_point') {
             data.orderByRaw(`COALESCE(points.point, 0) ${sortDirection}`)
+                .orderBy('members.created_at', 'desc')
+        } else if (sortBy === 'available_balance') {
+            data.orderByRaw(`COALESCE(member_wallets.ledger_balance, 0) - COALESCE(member_wallets.held_balance, 0) ${sortDirection}`)
                 .orderBy('members.created_at', 'desc')
         } else {
             data.orderBy('members.created_at', sortDirection)
@@ -1209,7 +1224,17 @@ class MemberController {
 
     async get({request, response, auth}) {
         const data = await Member.query()
-        .where('member_id',request.all().member_id)
+        .leftJoin('member_wallets', function () {
+            this.on('member_wallets.member_id', '=', 'members.member_id')
+                .andOn('member_wallets.currency', '=', Database.raw("'IDR'"))
+        })
+        .select(
+            'members.*',
+            Database.raw('COALESCE(member_wallets.ledger_balance, 0) as ledger_balance'),
+            Database.raw('COALESCE(member_wallets.held_balance, 0) as held_balance'),
+            Database.raw('COALESCE(member_wallets.ledger_balance, 0) - COALESCE(member_wallets.held_balance, 0) as available_balance')
+        )
+        .where('members.member_id',request.all().member_id)
         .filter(request.all().filter)
         .order(request.all().filter)
         .first()
@@ -1241,6 +1266,18 @@ class MemberController {
                 ...data.toJSON(),
                 total_point: point ? point.point : 0
             }
+        })
+    }
+
+    async member_wallet_transactions({request, response}) {
+        const data = await WalletLedgerEntry.query()
+            .where('member_id', request.all().member_id)
+            .orderBy('posted_at', 'desc')
+            .paginate(request.all().page, request.all().rows)
+
+        return response.json({
+            status: true,
+            data
         })
     }
 
