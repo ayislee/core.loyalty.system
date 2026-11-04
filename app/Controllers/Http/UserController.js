@@ -3,16 +3,31 @@ const User = use('App/Models/User')
 const UserPartner =  use('App/Models/UserPartner')
 const Database = use('Database')
 class UserController {
+    async actorPartner (userId) {
+        return UserPartner.query().where('user_id', userId).whereNull('deleted_at').first()
+    }
+    async ensureUserScope (actor, targetUserId) {
+        if (actor.type !== 'admin') return
+        const actorPartner = await this.actorPartner(actor.user_id)
+        if (!actorPartner) return
+        const targetPartner = await UserPartner.query().where('user_id', targetUserId).where('partner_id', actorPartner.partner_id).whereNull('deleted_at').first()
+        if (!targetPartner) { const error = new Error('User tidak terhubung ke partner Anda.'); error.status = 403; throw error }
+    }
     async gets({request, response, auth}) {
         let users, partner_id
         if(auth.user.type === 'admin') {
-            users = await User.query()
+            const actorPartner = await this.actorPartner(auth.user.user_id)
+            const query = User.query()
             .with('UserPartner',(build)=>{
                 build.with('partner')
             })
             .filter(request.all().filter)
             .order(request.all().order)
-            .paginate(request.all().page, request.all().rows)
+            if (actorPartner) {
+                const scopedUsers = Database.from('user_partners').where('partner_id', actorPartner.partner_id).whereNull('deleted_at').select('user_id')
+                query.whereIn('user_id', scopedUsers)
+            }
+            users = await query.paginate(request.all().page, request.all().rows)
 
         }else{
             if(auth.user.is_owner === 'yes'){
@@ -71,6 +86,7 @@ class UserController {
     async get({auth, request, response}) {
         let user, userPartner, userPartners, partner_id, users
         if(auth.user.type === 'admin'){
+            try { await this.ensureUserScope(auth.user, request.all().user_id) } catch (error) { return response.status(error.status || 403).json({ status: false, message: error.message }) }
             user = await User.query().where('user_id', request.all().user_id)
             .with('UserPartner',(build)=>{
                 build.with('partner')
@@ -115,15 +131,29 @@ class UserController {
     async create({auth, request, response}) {
         let trx, user
         if(auth.user.type === 'admin'){
-            user = new User()
-            user.email = request.all().email
-            user.firstname = request.all().firstname
-            user.lastname = request.all().lastname
-            user.phone = request.all().phone
-            user.password = request.all().password
-            user.type = request.all().type || 'partner'
-            
-            await user.save()
+            const actorPartner = await UserPartner.query().where('user_id', auth.user.user_id).whereNull('deleted_at').first()
+            trx = await Database.beginTransaction()
+            try {
+                user = new User()
+                user.email = request.all().email
+                user.firstname = request.all().firstname
+                user.lastname = request.all().lastname
+                user.phone = request.all().phone
+                user.password = request.all().password
+                user.type = request.all().type || 'partner'
+                await user.save(trx)
+
+                if (actorPartner) {
+                    const userPartner = new UserPartner()
+                    userPartner.user_id = user.user_id
+                    userPartner.partner_id = actorPartner.partner_id
+                    await userPartner.save(trx)
+                }
+                await trx.commit()
+            } catch (error) {
+                await trx.rollback()
+                throw error
+            }
             return response.json({
                 status: true,
                 message: 'success',
@@ -181,6 +211,7 @@ class UserController {
     }
     
     async edit({request, response, auth}) {
+        try { await this.ensureUserScope(auth.user, request.all().user_id) } catch (error) { return response.status(error.status || 403).json({ status: false, message: error.message }) }
         const user = await User.query()
         .where('user_id',request.all().user_id)
         .first()
@@ -203,7 +234,8 @@ class UserController {
 
     }
 
-    async resetPassword({request, response}) {
+    async resetPassword({auth, request, response}) {
+        try { await this.ensureUserScope(auth.user, request.all().user_id) } catch (error) { return response.status(error.status || 403).json({ status: false, message: error.message }) }
         const user = await User.query()
         .where('user_id', request.all().user_id)
         .first()
@@ -218,6 +250,9 @@ class UserController {
     }
 
     async create_user_partner({request, response, auth}) {
+        try { await this.ensureUserScope(auth.user, request.all().user_id) } catch (error) { return response.status(error.status || 403).json({ status: false, message: error.message }) }
+        const actorPartner = auth.user.type === 'admin' ? await this.actorPartner(auth.user.user_id) : null
+        if (actorPartner && Number(request.all().partner_id) !== Number(actorPartner.partner_id)) return response.status(403).json({ status: false, message: 'Partner harus sesuai dengan partner Anda.' })
         let userPartner
         userPartner = await UserPartner.query().where('user_id',request.all().user_id).first()
         if(userPartner){

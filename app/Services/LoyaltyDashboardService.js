@@ -32,12 +32,6 @@ class LoyaltyDashboardService {
     async _resolvePartnerScope(authUser) {
         if (!authUser) throw new Error('Unauthorized')
 
-        if (authUser.type === 'admin') {
-            return { type: 'admin', partnerId: null, partnerName: 'Semua Partner' }
-        }
-
-        if (authUser.type !== 'partner') throw new Error('User is not allowed to access dashboard')
-
         const userPartner = await Database.from('user_partners as up')
             .join('partners as p', 'p.partner_id', 'up.partner_id')
             .where('up.user_id', authUser.user_id)
@@ -46,7 +40,13 @@ class LoyaltyDashboardService {
             .select('up.partner_id', 'p.name as partner_name')
             .first()
 
-        if (!userPartner) throw new Error('Partner user is not linked to a partner')
+        if (authUser.type === 'admin' && !userPartner) {
+            return { type: 'admin', partnerId: null, partnerName: 'Semua Partner' }
+        }
+
+        if (!['admin', 'partner'].includes(authUser.type)) throw new Error('User is not allowed to access dashboard')
+
+        if (!userPartner) throw new Error('User is not linked to a partner')
         
         return { type: 'partner', partnerId: userPartner.partner_id, partnerName: userPartner.partner_name }
     }
@@ -56,7 +56,7 @@ class LoyaltyDashboardService {
         const period = this._normalizePeriod(year, month)
 
         // Summary - Members
-        let membersQuery = Database.from('members').whereNull('deleted_at')
+        let membersQuery = Database.from('members').whereNull('members.deleted_at')
         if (scope.type === 'partner') {
             membersQuery.join('member_partners', 'member_partners.member_id', 'members.member_id')
                 .where('member_partners.partner_id', scope.partnerId)
@@ -81,9 +81,30 @@ class LoyaltyDashboardService {
 
         // Summary - Partners (Admin only)
         let total_partners = 0
+        let total_refund = 0
+        let total_withdrawal = 0
         if (scope.type === 'admin') {
             const partnersStats = await Database.from('partners').whereNull('deleted_at').count('* as total_partners').first()
             total_partners = Number(partnersStats.total_partners || 0)
+        }
+        if (authUser.type === 'admin') {
+            const refundQuery = Database.from('transaction_refunds')
+                .whereIn('status', ['completed', 'completed_with_warning'])
+                .select(Database.raw('COALESCE(SUM(COALESCE(refund_net, 0)), 0) as total_refund'))
+            const withdrawalQuery = Database.from('withdrawals')
+                .where('status', 'completed')
+                .select(Database.raw('COALESCE(SUM(COALESCE(net_amount, 0)), 0) as total_withdrawal'))
+            if (scope.partnerId) {
+                const scopedMemberIds = Database.from('member_partners').where('partner_id', scope.partnerId).whereNull('deleted_at').select('member_id')
+                refundQuery.whereIn('member_id', scopedMemberIds.clone())
+                withdrawalQuery.whereIn('member_id', scopedMemberIds)
+            }
+            const [refundStats, withdrawalStats] = await Promise.all([
+                refundQuery.first(),
+                withdrawalQuery.first()
+            ])
+            total_refund = Number(refundStats?.total_refund || 0)
+            total_withdrawal = Number(withdrawalStats?.total_withdrawal || 0)
         }
 
         // Summary - Vouchers Created & Active
@@ -218,7 +239,10 @@ class LoyaltyDashboardService {
                 total_vouchers_created: Number(vouchersStats?.total_vouchers_created || 0),
                 active_vouchers: Number(vouchersStats?.active_vouchers || 0),
                 sold_vouchers: Number(soldVouchersStats?.sold_vouchers || 0),
-                redeemed_vouchers: Number(redeemedVouchersStats?.redeemed_vouchers || 0)
+                redeemed_vouchers: Number(redeemedVouchersStats?.redeemed_vouchers || 0),
+                total_refund,
+                total_withdrawal,
+                can_view_finance: authUser.type === 'admin'
             },
             recent_members,
             recent_point_history,

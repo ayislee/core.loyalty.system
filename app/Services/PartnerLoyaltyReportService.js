@@ -41,6 +41,11 @@ class PartnerLoyaltyReportService {
         if (!authUser) throw new Error('Unauthorized')
 
         if (authUser.type === 'admin') {
+            const userPartner = await UserPartner.query()
+                .where('user_id', authUser.user_id)
+                .whereNull('deleted_at')
+                .first()
+            if (userPartner) return userPartner.partner_id
             if (requestedPartnerId === null || requestedPartnerId === undefined || `${requestedPartnerId}`.trim() === '') {
                 return null
             }

@@ -1,5 +1,6 @@
 'use strict'
 const User = use('App/Models/User')
+const UserPartner = use('App/Models/UserPartner')
 const Utility = use("Utility");
 // const PointLib = use('App/Lib/PointLib')
 const uuid = use('uuid')
@@ -107,6 +108,8 @@ class AuthController {
             const data = await auth.attempt(request.all().email, request.all().password)
 
             let user = await User.query().where('email',request.all().email).first()
+            const userPartner = await UserPartner.query().where('user_id', user.user_id).whereNull('deleted_at').first()
+            user.partner_id = userPartner ? userPartner.partner_id : null
             data.user = user
             if(user.status === 'not active'){
                 // return 0

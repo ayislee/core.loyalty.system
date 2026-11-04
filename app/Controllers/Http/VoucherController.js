@@ -5,6 +5,10 @@ const ThisLib = use('App/Lib/LoyaltyLib')
 
 const DISCOUNT_CALCULATION_TYPES = ['fixed_amount', 'percentage']
 const VOUCHER_TYPES = ['free', 'amount', 'free_delivery']
+const scopedPartnerId = async (user) => {
+    const partnerId = await ThisLib.getPartnerIDFromUser(user.user_id)
+    return user.type === 'partner' ? (partnerId || '') : (partnerId || null)
+}
 
 const normalizeGlobalPeriod = (req) => {
     if (req.category !== 'global') return { status: true, start: null, end: null }
@@ -94,16 +98,14 @@ const normalizeDiscountPayload = (req, currentVoucher = null) => {
 class VoucherController {
     async gets({request, response, auth}){
         
-        let pid
+        const pid = await scopedPartnerId(auth.user)
         const data = Voucher.query()
         .with('partner')
         .with('created')
         .with('updated')
         .filter(request.all().filter)
         .order(request.all().order)
-        if(auth.user.type === 'partner'){
-            // partner's voucher
-            pid = await ThisLib.getPartnerIDFromUser(auth.user.user_id)
+        if(pid !== null){
             if(pid){
                 data.where('partner_id', pid)
             }else{
@@ -130,16 +132,14 @@ class VoucherController {
     }
 
     async get({request, response, auth}) {
-        let pid
+        const pid = await scopedPartnerId(auth.user)
         const data = Voucher.query()
         .with('partner')
         .with('created')
         .with('updated')
         .filter(request.all().filter)
         .order(request.all().order)
-        if(auth.user.type === 'partner'){
-            // partner's voucher
-            pid = await ThisLib.getPartnerIDFromUser(auth.user.user_id)
+        if(pid !== null){
             if(pid){
                 data.where('partner_id', pid)
             }else{
@@ -173,7 +173,7 @@ class VoucherController {
         }
         if (!globalPeriod.status) return response.status(422).json(globalPeriod)
 
-        let pid
+        const pid = await scopedPartnerId(auth.user)
         const voucher = new Voucher()
         voucher.name = req.name
         voucher.sku = hasValue(req.sku) ? req.sku : null
@@ -192,12 +192,9 @@ class VoucherController {
         voucher.global_start_date = globalPeriod.start
         voucher.global_end_date = globalPeriod.end
 
-        if(auth.user.type === 'admin'){
+        if(pid === null){
             voucher.partner_id = req.partner_id
-            
         }else{
-            pid = await ThisLib.getPartnerIDFromUser(auth.user.user_id)
-            console.log('pid',pid)
             if(pid){
                 voucher.partner_id = pid
             }else{
@@ -223,6 +220,10 @@ class VoucherController {
                 status: false,
                 message: 'Voucher not found'
             })
+        }
+        const scopedPartner = await scopedPartnerId(auth.user)
+        if (scopedPartner !== null && data.partner_id !== scopedPartner) {
+            return response.status(403).json({ status: false, message: 'Tidak diizinkan' })
         }
 
         const discountPayload = normalizeDiscountPayload(req, data)

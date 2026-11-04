@@ -15,6 +15,6 @@ Route.group(()=>{
     Route.post('/reset-password', 'UserController.resetPassword')
     .validator('UserID').validator('ResetUserPassword')
     .middleware('IsUserEdit')
-    Route.post('/partner','UserController.create_user_partner').middleware(['isAdmin','PartnerOnly']).validator('UserID').validator('PartnerID')
+    Route.post('/partner','UserController.create_user_partner').middleware('isAdmin').validator('UserID').validator('PartnerID')
    
 }).prefix(prefix).middleware(['auth:jwt'])

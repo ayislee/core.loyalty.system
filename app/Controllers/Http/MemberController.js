@@ -1,5 +1,6 @@
 'use strict'
 const Member = use('App/Models/Member')
+const Address = use('App/Models/Address')
 const Lib = use("App/Lib/LoyaltyLib")
 const GetPoint = use('App/Models/GetPoint')
 const Point = use('App/Models/Point')
@@ -1187,6 +1188,8 @@ class MemberController {
         const requestedSortBy = request.input('sort_by')
         const sortBy = ['total_point', 'available_balance'].includes(requestedSortBy) ? requestedSortBy : 'created_at'
         const sortDirection = `${request.input('sort_direction') || 'DESC'}`.toUpperCase() === 'ASC' ? 'ASC' : 'DESC'
+        const linkedPartnerId = await Lib.getPartnerIDFromUser(auth.user.user_id)
+        const partnerId = auth.user.type === 'partner' ? (linkedPartnerId || '') : (linkedPartnerId || null)
         const data = Member.query()
             .leftJoin('points', function () {
                 this.on('points.member_id', '=', 'members.member_id')
@@ -1205,6 +1208,12 @@ class MemberController {
             )
             .filter(request.all().filter)
 
+        if (partnerId !== null) {
+            data.innerJoin('member_partners', 'member_partners.member_id', 'members.member_id')
+                .where('member_partners.partner_id', partnerId)
+                .whereNull('member_partners.deleted_at')
+        }
+
         if (sortBy === 'total_point') {
             data.orderByRaw(`COALESCE(points.point, 0) ${sortDirection}`)
                 .orderBy('members.created_at', 'desc')
@@ -1215,10 +1224,37 @@ class MemberController {
             data.orderBy('members.created_at', sortDirection)
         }
 
-        const out = await data.paginate(request.all().page, request.all().rows)
+        const scopedMemberIds = partnerId === null ? null : Database.from('member_partners')
+            .where('partner_id', partnerId)
+            .whereNull('deleted_at')
+            .select('member_id')
+        const balanceQuery = Database
+            .from('members')
+            .leftJoin('member_wallets', function () {
+                this.on('member_wallets.member_id', '=', 'members.member_id')
+                    .andOn('member_wallets.currency', '=', Database.raw("'IDR'"))
+            })
+            .select(Database.raw('COALESCE(SUM(COALESCE(member_wallets.ledger_balance, 0) - COALESCE(member_wallets.held_balance, 0)), 0) as total_available_balance'))
+        const pointQuery = Database
+            .from('points')
+            .whereNull('deleted_at')
+            .select(Database.raw('COALESCE(SUM(COALESCE(point, 0)), 0) as total_point'))
+        if (scopedMemberIds) {
+            balanceQuery.whereIn('members.member_id', scopedMemberIds.clone())
+            pointQuery.whereIn('member_id', scopedMemberIds)
+        }
+        const [out, balanceSummary, pointSummary] = await Promise.all([
+            data.paginate(request.all().page, request.all().rows),
+            balanceQuery.first(),
+            pointQuery.first()
+        ])
         return response.json({
             status: true,
-            data : out
+            data : out,
+            summary: {
+                total_available_balance: balanceSummary.total_available_balance,
+                total_point: pointSummary.total_point
+            }
         })
     }
 
@@ -1239,9 +1275,15 @@ class MemberController {
         .order(request.all().filter)
         .first()
 
+        const addresses = await Address.query()
+            .where('member_id', request.all().member_id)
+            .orderBy('address_default', 'desc')
+            .orderBy('address_id', 'desc')
+            .fetch()
+
         return response.json({
             status: true,
-            data : data
+            data : data ? { ...data.toJSON(), addresses: addresses.toJSON() } : null
         })
     }
 
