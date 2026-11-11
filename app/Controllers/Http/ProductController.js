@@ -494,7 +494,14 @@ class ProductController {
                 : res?.data?.data
 
             const stores = this._normalizeStoreList(payload)
-            const defaultStore = await MemberStoreService.findBySlug(Env.get('DEFAULT_STORE_SLUG'), activeCompanySlug)
+            let defaultStore = null
+            try {
+                defaultStore = await MemberStoreService.findBySlug(Env.get('DEFAULT_STORE_SLUG'), activeCompanySlug)
+            } catch (error) {
+                // The store list is still usable when the supplementary default
+                // store lookup is temporarily unavailable during an upstream cold start.
+                defaultStore = null
+            }
             if (defaultStore && !stores.some((store) => `${store?.store_slug || store?.slug || ''}` === `${Env.get('DEFAULT_STORE_SLUG')}`)) {
                 stores.unshift(defaultStore)
             }
